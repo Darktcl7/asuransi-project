@@ -1,0 +1,12 @@
+FILES FIXED!
+
+Config files sudah direname ke .cjs format:
+✅ postcss.config.cjs
+✅ tailwind.config.cjs
+
+SEKARANG:
+1. Tekan Ctrl+C di terminal untuk stop server
+2. Run ulang: npm run dev
+3. Buka browser: http://localhost:5173
+
+Seharusnya tidak ada error lagi!
