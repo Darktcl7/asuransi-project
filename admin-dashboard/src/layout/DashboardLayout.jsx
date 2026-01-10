@@ -15,16 +15,17 @@ const DashboardLayout = () => {
   };
 
   const menuItems = [
-    { path: '/dashboard', icon: '📊', label: 'Dashboard', exact: true },
-    { path: '/dashboard/users', icon: '👥', label: 'Users' },
-    { path: '/dashboard/claims', icon: '🎫', label: 'Claims' },
-    { path: '/dashboard/policies', icon: '📋', label: 'Policies' },
-    { path: '/dashboard/devices', icon: '📱', label: 'Devices' },
+    { path: '/', icon: '📊', label: 'Dashboard', exact: true },
+    { path: '/users', icon: '👥', label: 'Users' },
+    { path: '/claims', icon: '🎫', label: 'Claims' },
+    { path: '/policies', icon: '📋', label: 'Policies' },
+    { path: '/devices', icon: '📱', label: 'Devices' },
     // ❌ REMOVED - Policy balance system now used (setiap policy punya saldo sendiri)
-    // { path: '/dashboard/wallets', icon: '💰', label: 'Wallets' },
-    // { path: '/dashboard/topups', icon: '💳', label: 'Top-Ups' },
-    // { path: '/dashboard/manual-topup', icon: '➕', label: 'Manual Top-Up' },
-    { path: '/dashboard/manual-policy-create', icon: '🛡️', label: 'Create Policy' },
+    // { path: '/wallets', icon: '💰', label: 'Wallets' },
+    // { path: '/topups', icon: '💳', label: 'Top-Ups' },
+    // { path: '/manual-topup', icon: '➕', label: 'Manual Top-Up' },
+    { path: '/manual-policy-create', icon: '🛡️', label: 'Create Policy' },
+    { path: '/admin-claim-create', icon: '🆘', label: 'Assist Claim' },
   ];
 
   const isActive = (path, exact = false) => {
@@ -68,8 +69,8 @@ const DashboardLayout = () => {
               key={item.path}
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${isActive(item.path, item.exact)
-                  ? 'bg-white/20 text-white shadow-lg'
-                  : 'text-white/80 hover:bg-white/10 hover:text-white'
+                ? 'bg-white/20 text-white shadow-lg'
+                : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <span className="text-2xl">{item.icon}</span>

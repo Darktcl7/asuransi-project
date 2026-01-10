@@ -640,6 +640,110 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
         }
         
         return Response(data)
+    
+    @action(detail=False, methods=['post'])
+    def create_for_user(self, request):
+        """
+        Admin creates a claim on behalf of a user.
+        Use case: User's phone is damaged and they cannot access the app.
+        POST /api/admin/claims/create_for_user/
+        """
+        from claims.models import ClaimPhoto
+        from django.db import transaction
+        import traceback
+        
+        try:
+            data = request.data
+            
+            # Validate required fields
+            user_id = data.get('user_id')
+            policy_id = data.get('policy_id')
+            damage_type = data.get('damage_type')
+            incident_date = data.get('incident_date')
+            
+            if not all([user_id, policy_id, damage_type, incident_date]):
+                return Response({
+                    'error': 'Missing required fields: user_id, policy_id, damage_type, incident_date'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get user
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return Response({'error': 'User tidak ditemukan'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get and validate policy
+            try:
+                policy = Policy.objects.get(id=policy_id, user=user)
+            except Policy.DoesNotExist:
+                return Response({'error': 'Policy tidak ditemukan atau bukan milik user ini'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Validate policy is active
+            if policy.status != 'active':
+                return Response({'error': f'Policy tidak aktif (status: {policy.status})'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate not expired
+            if policy.is_expired():
+                policy.status = 'expired'
+                policy.save()
+                return Response({
+                    'error': 'Policy sudah kadaluarsa',
+                    'expiry_date': policy.expiry_date.isoformat()
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate balance
+            if policy.policy_balance <= 0:
+                return Response({
+                    'error': 'Saldo policy sudah habis',
+                    'policy_balance': float(policy.policy_balance)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            with transaction.atomic():
+                # Create claim on behalf of user
+                claim = Claim.objects.create(
+                    user=user,
+                    policy=policy,
+                    claim_number=f"CLM-ADM-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                    damage_type=damage_type,
+                    damage_description=data.get('damage_description', 'Klaim diajukan oleh Admin'),
+                    incident_date=incident_date,
+                    claim_amount=0,  # Admin will set this on approval
+                    status='pending',
+                    admin_notes=f"Klaim diajukan oleh Admin ({request.user.email}) atas nama user. Alasan: {data.get('reason', 'HP user rusak, tidak bisa akses aplikasi')}"
+                )
+                
+                # Handle photo uploads (if any)
+                photos = request.FILES.getlist('photos')
+                photo_count = 0
+                if photos:
+                    for photo in photos:
+                        if photo.size <= 10 * 1024 * 1024:  # Max 10MB
+                            ClaimPhoto.objects.create(
+                                claim=claim,
+                                photo=photo
+                            )
+                            photo_count += 1
+            
+            # Clear dashboard cache
+            cache.delete('admin_dashboard_stats')
+            
+            return Response({
+                'message': f'Klaim berhasil dibuat atas nama {user.first_name} {user.last_name}'.strip() or user.email,
+                'data': {
+                    'id': str(claim.id),
+                    'claim_number': claim.claim_number,
+                    'user_email': user.email,
+                    'status': claim.status,
+                },
+                'created_by_admin': request.user.email,
+                'photos_uploaded': photo_count
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({
+                'error': f'Server error: {str(e)}',
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminPolicyViewSet(viewsets.ModelViewSet):
@@ -662,6 +766,11 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         
+        # Filter by user (for admin-assisted claims)
+        user_filter = self.request.query_params.get('user', None)
+        if user_filter:
+            queryset = queryset.filter(user_id=user_filter)
+        
         return queryset
     
     def list(self, request):
@@ -673,7 +782,13 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
             'policy_number': policy.policy_number,
             'user_email': policy.user.email,
             'tier': policy.tier.tier_name,
-            'device': f"{policy.device_package.device_brand} {policy.device_package.device_model}",
+            'tier_name': policy.tier.tier_name,  # Alias for frontend
+            'device': f"{policy.device_package.device_brand} {policy.device_package.device_model}",  # String for PoliciesPage
+            'device_obj': {  # Object for AdminClaimCreatePage
+                'brand': policy.device_package.device_brand,
+                'model': policy.device_package.device_model,
+            },
+            'policy_balance': float(policy.policy_balance),
             'status': policy.status,
             'activation_date': policy.activation_date,
             'expiry_date': policy.expiry_date,

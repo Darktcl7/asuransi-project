@@ -6,9 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notification.dart';
 
 class NotificationService {
-  // Ganti URL sesuai dengan alamat server Django Anda
-  // Gunakan 10.0.2.2 untuk emulator Android, atau IP untuk device fisik
-  static const String baseUrl = 'http://192.168.100.4:8000/api/notifications';
+  // ✅ PRODUCTION SERVER:
+  static const String baseUrl = 'http://148.230.97.130/api/notifications';
 
   // Get token from SharedPreferences
   Future<String?> _getToken() async {

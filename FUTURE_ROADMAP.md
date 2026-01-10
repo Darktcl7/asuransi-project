@@ -78,6 +78,9 @@
 *   Pass: `Demo1234`
 *   IP Server (Localhost Fisik): `192.168.100.4:8000`
 
+(env) [root@srv933640 Smile Project]# python manage.py createsuperuser
+Email: admin@smile.com (atau email Anda)
+Password: Admin123! (atau password pilihan Anda)
 ---
 *Last Updated: 2026-01-08 by AI Assistant*
 

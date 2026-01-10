@@ -1,8 +1,8 @@
 // api/axios.js
 import axios from 'axios';
 
-// Base URL untuk backend Django (from env or fallback to localhost)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+// Base URL untuk backend Django - PRODUCTION SERVER
+const API_BASE_URL = 'http://148.230.97.130/api';
 
 // Create axios instance
 const axiosInstance = axios.create({

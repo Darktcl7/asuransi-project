@@ -15,6 +15,7 @@ import DevicesPage from './pages/DevicesPage';
 // import TopUpsPage from './pages/TopUpsPage'; // ❌ REMOVED - Policy balance system
 // import ManualTopUpPage from './pages/ManualTopUpPage'; // ❌ REMOVED - Policy balance system
 import ManualPolicyCreatePage from './pages/ManualPolicyCreatePage';
+import AdminClaimCreatePage from './pages/AdminClaimCreatePage';
 
 // Create QueryClient for React Query
 const queryClient = new QueryClient({
@@ -29,21 +30,21 @@ const queryClient = new QueryClient({
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  return authService.isAuthenticated() ? children : <Navigate to="/login" />;
+  return authService.isAuthenticated() ? children : <Navigate to="/dashboard/login" />;
 };
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/dashboard">
           <Routes>
             {/* Login Route */}
             <Route path="/login" element={<LoginPage />} />
 
             {/* Dashboard Routes */}
             <Route
-              path="/dashboard"
+              path="/"
               element={
                 <ProtectedRoute>
                   <DashboardLayout />
@@ -60,11 +61,11 @@ function App() {
               {/* <Route path="topups" element={<TopUpsPage />} /> */}
               {/* <Route path="manual-topup" element={<ManualTopUpPage />} /> */}
               <Route path="manual-policy-create" element={<ManualPolicyCreatePage />} />
+              <Route path="admin-claim-create" element={<AdminClaimCreatePage />} />
             </Route>
 
             {/* Default Redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-            <Route path="*" element={<Navigate to="/dashboard" />} />
+            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>
       </ToastProvider>
@@ -73,4 +74,3 @@ function App() {
 }
 
 export default App;
-

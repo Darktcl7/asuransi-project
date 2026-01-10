@@ -12,20 +12,17 @@ class ApiService {
   // Uncomment the appropriate line based on your environment:
   // ================================================================
   
-  // For Web/Desktop testing:
+  // For Local Development (Web/Desktop):
   // static const String baseUrl = 'http://127.0.0.1:8000/api';
   
   // For Android Emulator:
   // static const String baseUrl = 'http://10.0.2.2:8000/api';
   
-  // For Physical Device (use your computer's IP address):
-  static const String baseUrl = 'http://192.168.100.4:8000/api';
-  
-  // For iOS Simulator:
-  // static const String baseUrl = 'http://127.0.0.1:8000/api';
-  
-  // For Physical Device (update with your computer's IP):
+  // For Local Physical Device (use your computer's IP address):
   // static const String baseUrl = 'http://192.168.100.4:8000/api';
+  
+  // ✅ PRODUCTION SERVER:
+  static const String baseUrl = 'http://148.230.97.130/api';
   
   // ================================================================
   String? _token;

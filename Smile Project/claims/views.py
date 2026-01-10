@@ -225,3 +225,125 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             'message': 'Klaim selesai dikerjakan',
             'data': ClaimSerializer(claim).data
         })
+
+    @transaction.atomic
+    @action(detail=False, methods=['post'])
+    def create_for_user(self, request):
+        """
+        Admin creates a claim on behalf of a user.
+        Use case: User's phone is damaged and they cannot access the app.
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        data = request.data
+        
+        # Validate required fields
+        user_id = data.get('user_id')
+        policy_id = data.get('policy_id')
+        damage_type = data.get('damage_type')
+        incident_date = data.get('incident_date')
+        
+        if not all([user_id, policy_id, damage_type, incident_date]):
+            return Response({
+                'error': 'Missing required fields: user_id, policy_id, damage_type, incident_date'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get user
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User tidak ditemukan'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get and validate policy
+        try:
+            policy = Policy.objects.get(id=policy_id, user=user)
+        except Policy.DoesNotExist:
+            return Response({'error': 'Policy tidak ditemukan atau bukan milik user ini'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Validate policy is active
+        if policy.status != 'active':
+            return Response({'error': f'Policy tidak aktif (status: {policy.status})'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate not expired
+        if policy.is_expired():
+            policy.status = 'expired'
+            policy.save()
+            return Response({
+                'error': 'Policy sudah kadaluarsa',
+                'expiry_date': policy.expiry_date.isoformat()
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate balance
+        if policy.policy_balance <= 0:
+            return Response({
+                'error': 'Saldo policy sudah habis',
+                'policy_balance': float(policy.policy_balance)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create claim on behalf of user
+        claim = Claim.objects.create(
+            user=user,
+            policy=policy,
+            claim_number=f"CLM-ADM-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            damage_type=damage_type,
+            damage_description=data.get('damage_description', 'Klaim diajukan oleh Admin'),
+            incident_date=incident_date,
+            claim_amount=0,  # Admin will set this on approval
+            status='pending',
+            admin_notes=f"Klaim diajukan oleh Admin ({request.user.email}) atas nama user. Alasan: {data.get('reason', 'HP user rusak, tidak bisa akses aplikasi')}"
+        )
+        
+        # Handle photo uploads (if any)
+        photos = request.FILES.getlist('photos')
+        if photos:
+            for photo in photos:
+                if photo.size <= 10 * 1024 * 1024:  # Max 10MB
+                    ClaimPhoto.objects.create(
+                        claim=claim,
+                        photo=photo
+                    )
+        
+        return Response({
+            'message': f'Klaim berhasil dibuat atas nama {user.full_name or user.email}',
+            'data': ClaimSerializer(claim, context={'request': request}).data,
+            'created_by_admin': request.user.email,
+            'photos_uploaded': len(photos) if photos else 0
+        }, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['get'])
+    def users_with_policies(self, request):
+        """
+        Get list of users who have active policies.
+        Used for Admin-Assisted Claim form dropdown.
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Get users with at least one active policy
+        # Note: Policy model uses default related_name 'policy_set'
+        users_with_active_policies = User.objects.filter(
+            policy__status='active'
+        ).distinct().values('id', 'email', 'full_name', 'phone_number')
+        
+        return Response(list(users_with_active_policies))
+    
+    @action(detail=False, methods=['get'])
+    def user_policies(self, request):
+        """
+        Get active policies for a specific user.
+        Used for Admin-Assisted Claim form.
+        """
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        policies = Policy.objects.filter(
+            user_id=user_id,
+            status='active'
+        ).select_related('device').values(
+            'id', 'policy_number', 'device__brand', 'device__model', 
+            'policy_balance', 'expiry_date', 'tier_name'
+        )
+        
+        return Response(list(policies))

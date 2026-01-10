@@ -69,6 +69,28 @@ export const adminService = {
     return response.data;
   },
 
+  // ===== ADMIN-ASSISTED CLAIM =====
+  async getUsersWithPolicies() {
+    const response = await axios.get('/admin/claims/users_with_policies/');
+    return response.data;
+  },
+
+  async getUserPolicies(userId) {
+    const response = await axios.get('/admin/claims/user_policies/', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  async createClaimForUser(formData) {
+    const response = await axios.post('/admin/claims/create_for_user/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // ===== POLICIES =====
   async getPolicies(params = {}) {
     const response = await axios.get('/admin/policies/', { params });

@@ -4,15 +4,15 @@ import axios from '../api/axios';
 export const authService = {
   // Login admin
   async login(email, password) {
-    const response = await axios.post('/auth/login/', {
-      username: email,
+    const response = await axios.post('/login/', {
+      identifier: email,  // Support email or phone
       password: password,
     });
-    
+
     if (response.data.token) {
       localStorage.setItem('admin_token', response.data.token);
     }
-    
+
     return response.data;
   },
 
