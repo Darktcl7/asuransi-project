@@ -127,8 +127,26 @@ const Navbar = () => {
                 </button>
             </div>
 
+            {/* Mobile Overlay */}
+            <div
+                className={`navbar-overlay ${isMenuOpen ? 'open' : ''}`}
+                onClick={() => setIsMenuOpen(false)}
+            />
+
             {/* Mobile Menu */}
             <div className={`navbar-mobile ${isMenuOpen ? 'open' : ''}`}>
+                {/* Close Button */}
+                <button
+                    className="mobile-close-btn"
+                    onClick={() => setIsMenuOpen(false)}
+                    aria-label="Close menu"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+
                 {authService.isAuthenticated() ? (
                     <>
                         <div className="mobile-user-info">

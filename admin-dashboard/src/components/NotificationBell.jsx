@@ -46,9 +46,9 @@ const NotificationBell = () => {
     if (diffMins < 60) return `${diffMins} menit lalu`;
     if (diffHours < 24) return `${diffHours} jam lalu`;
     if (diffDays < 7) return `${diffDays} hari lalu`;
-    
-    return date.toLocaleDateString('id-ID', { 
-      day: 'numeric', 
+
+    return date.toLocaleDateString('id-ID', {
+      day: 'numeric',
       month: 'short',
       hour: '2-digit',
       minute: '2-digit'
@@ -57,12 +57,12 @@ const NotificationBell = () => {
 
   const handleClaimClick = (claimId) => {
     setIsOpen(false);
-    navigate('/dashboard/claims');
+    navigate('/claims');
   };
 
   const handleViewAll = () => {
     setIsOpen(false);
-    navigate('/dashboard/claims?status=pending');
+    navigate('/claims?status=pending');
   };
 
   return (

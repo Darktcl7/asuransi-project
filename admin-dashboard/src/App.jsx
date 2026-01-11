@@ -30,14 +30,14 @@ const queryClient = new QueryClient({
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  return authService.isAuthenticated() ? children : <Navigate to="/dashboard/login" />;
+  return authService.isAuthenticated() ? children : <Navigate to="/login" />;
 };
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter basename="/dashboard">
+        <BrowserRouter basename="/admin_store">
           <Routes>
             {/* Login Route */}
             <Route path="/login" element={<LoginPage />} />

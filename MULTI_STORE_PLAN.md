@@ -297,7 +297,9 @@ class Claim(models.Model):
 | Create policy | ❌ | ❌ | ✅ | ✅ |
 | Approve claim | ❌ | ❌ | ✅ | ✅ |
 | Manage users toko | ❌ | ❌ | ✅ | ✅ |
+| **Manage devices** | ❌ | ❌ | ❌ | ✅ |
 | Manage toko | ❌ | ❌ | ❌ | ✅ |
+| Manage Policy Tiers | ❌ | ❌ | ❌ | ✅ |
 | Lihat semua activity | ❌ | ❌ | ❌ | ✅ |
 | Dashboard global | ❌ | ❌ | ❌ | ✅ |
 
@@ -465,6 +467,7 @@ GET /api/admin/policies/
 - [ ] Create store management page
 - [ ] Create global dashboard with store stats
 - [ ] Create activity log viewer
+- [ ] **Create Policy Tier Management page** (Update price, range, duration)
 - [ ] Add store filter to all pages
 - [ ] Create comparative reports
 

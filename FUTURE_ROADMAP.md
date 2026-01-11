@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-01-08
 **Project Name:** Smile by SPC (formerly PhoneGuard)
-**Components:** Django Backend, React Admin Dashboard, Flutter Mobile App
+**Components:** Django Backend, React Admin Store, Flutter Mobile App
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 🎨 Rebranding ("Smile by SPC")
 *   **Mobile App (Flutter)**: ✅ Semua layar (Login, Register, Dashboard, Profile, Claims, Claim Form) menggunakan branding "Smile by SPC", logo 😊, dan warna **Oranye**.
-*   **Admin Dashboard**: ✅ Login Page & Sidebar sudah menggunakan branding "Smile by SPC" dengan warna **Oranye**.
+*   **Admin Store**: ✅ Login Page & Sidebar sudah menggunakan branding "Smile by SPC" dengan warna **Oranye**.
 *   **Backend**: ✅ Setup aman.
 
 ### 🛠️ Fitur & Perbaikan Teknis
@@ -29,8 +29,8 @@
 4.  **Upload Foto End-to-End**:
     *   ✅ Flutter mengirim foto via `MultipartRequest`.
     *   ✅ Django menerima dan menyimpan ke `ClaimPhoto`.
-    *   ✅ Admin Dashboard menampilkan foto di modal review.
-5.  **Admin Dashboard Enhancements**:
+    *   ✅ Admin Store menampilkan foto di modal review.
+5.  **Admin Store Enhancements**:
     *   ✅ **Click to Zoom foto** dengan lightbox modal.
     *   ✅ "Open Original" button untuk melihat foto ukuran penuh.
 
@@ -67,9 +67,19 @@
 
 ---
 
-## 5. 🔑 Kredensial Akses (Development)
+## 5. � Planned Changes
 
-**Admin Dashboard** (`http://localhost:5173`)
+### Devices Management → Super Admin Only
+*   **Status**: 📋 Planned
+*   **Description**: Fitur "Devices" akan dipindahkan dari Admin Store ke Super Admin saja
+*   **Reason**: Super Admin yang bertanggung jawab untuk input dan manage data devices (merek HP, model, harga)
+*   **Impact**: Menu "Devices" akan dihapus dari Admin Store dan hanya muncul di Super Admin Dashboard
+
+---
+
+## 6. 🔑 Kredensial Akses (Development)
+
+**Admin Store** (`http://148.230.97.130/admin_store`)
 *   Email: `chluik277@gmail.com`
 *   Pass: `admin123`
 

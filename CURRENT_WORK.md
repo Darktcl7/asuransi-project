@@ -4,7 +4,7 @@
 
 **Project Name**: Smile Insurance  
 **Server**: 148.230.97.130  
-**Last Updated**: 10 Januari 2026
+**Last Updated**: 11 Januari 2026
 
 ---
 
@@ -12,11 +12,14 @@
 
 | Service | URL |
 |---------|-----|
-| Admin Dashboard | http://148.230.97.130/dashboard |
+| Admin Store Dashboard | http://148.230.97.130/admin_store |
 | Customer Website | http://148.230.97.130/ |
 | API | http://148.230.97.130/api/ |
 | Django Admin | http://148.230.97.130/admin/ |
 | APK Download | http://148.230.97.130/download/smile-insurance.apk |
+
+> **Note:** Link lama `/dashboard` akan redirect otomatis ke `/admin_store`
+
 
 ---
 
@@ -24,6 +27,57 @@
 
 - **Email**: chluik277@gmail.com
 - **Password**: adminsmile277
+
+---
+
+## 💻 Technology Stack
+
+Project ini menggunakan **Full-Stack** dengan berbagai bahasa pemrograman:
+
+| Bahasa | Persentase | Digunakan Untuk | Lokasi Folder |
+|--------|------------|-----------------|---------------|
+| **Python** 🐍 | ~33% | Django Backend (API, Database) | `Smile Project/` |
+| **JavaScript** | ~28% | Admin Store & Customer Website (React) | `admin-dashboard/`, `customer-website/` |
+| **Dart** 🎯 | ~27% | Mobile App (Flutter) | `smile_app/` |
+| **CSS** | ~6% | Styling website | `*/src/*.css` |
+| **C++** | ~2% | Flutter engine (auto-generated) | `smile_app/windows/`, `smile_app/linux/` |
+| **CMake** | ~2% | Flutter build config (auto-generated) | `smile_app/*/CMakeLists.txt` |
+
+### Penjelasan Singkat:
+
+- **Python/Django**: Backend server yang menangani API, database, dan business logic
+- **JavaScript/React**: Frontend untuk Admin Store dan Customer Website di browser
+- **Dart/Flutter**: Mobile app untuk Android (file APK yang bisa didownload user)
+- **CSS**: Styling untuk membuat tampilan website menarik
+- **C++/CMake**: File auto-generated oleh Flutter untuk build desktop (tidak perlu diedit)
+
+### Stack Architecture:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SMILE INSURANCE                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │ Admin Store │  │ Customer Website│  │ Mobile App  │ │
+│  │ (React/JS)      │  │ (React/JS)      │  │ (Flutter)   │ │
+│  └────────┬────────┘  └────────┬────────┘  └──────┬──────┘ │
+│           │                    │                   │        │
+│           └────────────────────┴───────────────────┘        │
+│                              │                              │
+│                              ▼                              │
+│                    ┌─────────────────┐                      │
+│                    │  Django API     │                      │
+│                    │  (Python)       │                      │
+│                    └────────┬────────┘                      │
+│                             │                               │
+│                             ▼                               │
+│                    ┌─────────────────┐                      │
+│                    │  PostgreSQL DB  │                      │
+│                    └─────────────────┘                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -40,7 +94,7 @@ D:\Django Project\Asuransi Project\
 │   ├── admin_api/           # Admin API endpoints
 │   └── manage.py
 │
-├── admin-dashboard/         # React Admin Dashboard
+├── admin-dashboard/         # React Admin Store
 │   ├── src/
 │   │   ├── pages/           # Page components
 │   │   ├── components/      # Reusable components
@@ -57,7 +111,7 @@ D:\Django Project\Asuransi Project\
 
 ## ✅ Completed Features
 
-### Admin Dashboard
+### Admin Store
 
 | Feature | Route | Description |
 |---------|-------|-------------|
@@ -114,7 +168,7 @@ systemctl restart nginx
 ```
 /var/www/smile/
 ├── Smile Project/              # Django backend
-├── admin-dashboard-build/      # Admin dashboard (React build)
+├── admin-store-build/          # Admin Store Dashboard (React build) - NEW!
 ├── customer-website-build/     # Customer website (React build)
 ├── media/                      # Uploaded files
 ├── static/                     # Static files
@@ -140,8 +194,8 @@ ssh root@148.230.97.130 "systemctl restart smile"
 cd "D:\Django Project\Asuransi Project\admin-dashboard"
 npm run build
 
-# Upload
-scp -r "D:\Django Project\Asuransi Project\admin-dashboard\dist\*" root@148.230.97.130:/var/www/smile/admin-dashboard-build/
+# Upload to admin-store-build (NOT admin-dashboard-build)
+scp -r "D:\Django Project\Asuransi Project\admin-dashboard\dist\*" root@148.230.97.130:/var/www/smile/admin-store-build/
 ```
 
 ---
@@ -161,6 +215,16 @@ scp -r "D:\Django Project\Asuransi Project\admin-dashboard\dist\*" root@148.230.
   - `Wallet` - User wallet
   - `TopUpTransaction` - Top-up history
   - `WalletHistory` - Transaction history
+
+### Policy Tier Reference (Current)
+
+| Tier | Price Range (Device Value) | Policy Price | Duration |
+|------|---------------------------|--------------|----------|
+| **Standar** | Rp 1.500.000 - Rp 3.000.000 | Rp 150.000 | 1 Year |
+| **Gold** | Rp 3.000.001 - Rp 5.000.000 | Rp 250.000 | 1 Year |
+| **Premium** | Rp 5.000.001 - Rp 99.999.999 | Rp 500.000 | 1 Year |
+
+*Note: Super Admin will be able to update these configurations dynamically in the future update.*
 
 ---
 
@@ -199,6 +263,14 @@ scp -r "D:\Django Project\Asuransi Project\admin-dashboard\dist\*" root@148.230.
 ---
 
 ## 📝 Recent Changes Log
+
+### 11 January 2026
+- ✅ Changed Admin Store URL from `/dashboard` to `/admin_store`
+- ✅ Added auto-redirect from `/dashboard` to `/admin_store`
+- ✅ Fixed mobile sidebar - added close button (X) and overlay backdrop
+- ✅ Fixed notification API endpoints (mark_as_read, mark_all_as_read)
+- ✅ Fixed notification click to redirect to claims page
+- 📋 **PLANNED**: Move Devices management from Admin Store to Super Admin only
 
 ### 10 January 2026
 - ✅ Implemented Admin-Assisted Claim feature

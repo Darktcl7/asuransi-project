@@ -51,18 +51,21 @@ export const apiService = {
     },
 
     async markNotificationAsRead(id) {
-        const response = await axios.patch(`/notifications/${id}/`, { is_read: true });
+        // Backend uses POST with action endpoint, not PATCH
+        const response = await axios.post(`/notifications/${id}/mark_as_read/`);
         return response.data;
     },
 
     async markAllNotificationsAsRead() {
-        const response = await axios.post('/notifications/mark-all-read/');
+        // Backend uses underscores: mark_all_as_read
+        const response = await axios.post('/notifications/mark_all_as_read/');
         return response.data;
     },
 
     async getUnreadNotificationCount() {
-        const response = await axios.get('/notifications/unread-count/');
-        return response.data.count || 0;
+        // Backend uses underscore: unread_count
+        const response = await axios.get('/notifications/unread_count/');
+        return response.data.unread_count || 0;
     },
 
     // ===== WALLET =====
