@@ -1,7 +1,9 @@
 // pages/UsersPage.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../services/adminService';
+import { authService } from '../services/authService';
+import { storeService } from '../services/storeService';
 import { useDebounce, usePagination } from '../utils/hooks';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { useToast } from '../components/Toast';
@@ -14,6 +16,13 @@ const UsersPage = () => {
   const [isVerified, setIsVerified] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [showResetPassword, setShowResetPassword] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+
+  // Check if current user is Super Admin
+  const isSuperAdmin = authService.isSuperAdmin();
+
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -22,6 +31,15 @@ const UsersPage = () => {
     address: '',
     is_verified: false,
     is_active: true,
+    role: 'customer',
+    store: '',
+  });
+
+  // Fetch stores for Super Admin
+  const { data: storesData } = useQuery({
+    queryKey: ['stores-list'],
+    queryFn: () => storeService.getStores(),
+    enabled: isSuperAdmin,
   });
 
   // Debounce search untuk prevent excessive API calls
@@ -89,6 +107,8 @@ const UsersPage = () => {
         address: userDetail.address || '',
         is_verified: userDetail.is_verified || false,
         is_active: userDetail.is_active !== undefined ? userDetail.is_active : true,
+        role: userDetail.role || 'customer',
+        store: userDetail.store?.id || '',
       });
     } catch (error) {
       console.error('Failed to fetch user details:', error);
@@ -119,6 +139,56 @@ const UsersPage = () => {
       userId: selectedUser.id,
       data: editForm,
     });
+  };
+
+  // Delete user mutation (Super Admin only)
+  const deleteMutation = useMutation({
+    mutationFn: (userId) => adminService.deleteUser(userId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['users']);
+      setShowDeleteConfirm(null);
+      toast.success(data.message || 'User deleted successfully!');
+    },
+    onError: (error) => {
+      console.error('Delete failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to delete user');
+      if (error.response?.data?.suggestion) {
+        toast.info(error.response?.data?.suggestion);
+      }
+    },
+  });
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ userId, password }) => adminService.resetUserPassword(userId, password),
+    onSuccess: (data) => {
+      setShowResetPassword(null);
+      setNewPassword('');
+      toast.success(data.message || 'Password reset successfully!');
+    },
+    onError: (error) => {
+      console.error('Reset password failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to reset password');
+    },
+  });
+
+  const handleDelete = () => {
+    if (showDeleteConfirm) {
+      deleteMutation.mutate(showDeleteConfirm.id);
+    }
+  };
+
+  const handleResetPassword = () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.warning('Password harus minimal 6 karakter');
+      return;
+    }
+    if (showResetPassword) {
+      resetPasswordMutation.mutate({
+        userId: showResetPassword.id,
+        password: newPassword
+      });
+    }
   };
 
   return (
@@ -191,6 +261,9 @@ const UsersPage = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    {isSuperAdmin && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role / Store</th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -208,6 +281,24 @@ const UsersPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {user.phone_number || '-'}
                       </td>
+                      {isSuperAdmin && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                              user.role === 'store_admin' ? 'bg-blue-100 text-blue-800' :
+                                user.role === 'store_staff' ? 'bg-cyan-100 text-cyan-800' :
+                                  'bg-gray-100 text-gray-800'
+                              }`}>
+                              {user.role || 'customer'}
+                            </span>
+                            {user.store && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                🏪 {user.store.code}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex gap-2">
                           {user.is_verified ? (
@@ -234,12 +325,31 @@ const UsersPage = () => {
                         {new Date(user.date_joined).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleEditClick(user)}
-                          className="text-indigo-600 hover:text-indigo-900 font-semibold"
-                        >
-                          ✏️ Edit
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditClick(user)}
+                            className="text-indigo-600 hover:text-indigo-900 font-semibold"
+                            title="Edit User"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => setShowResetPassword(user)}
+                            className="text-orange-600 hover:text-orange-900 font-semibold"
+                            title="Reset Password"
+                          >
+                            🔑
+                          </button>
+                          {isSuperAdmin && user.role !== 'super_admin' && (
+                            <button
+                              onClick={() => setShowDeleteConfirm(user)}
+                              className="text-red-600 hover:text-red-900 font-semibold"
+                              title="Delete User"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -370,6 +480,54 @@ const UsersPage = () => {
                   />
                 </div>
 
+                {/* Role & Store Assignment - Super Admin Only */}
+                {isSuperAdmin && (
+                  <div className="bg-purple-50 p-4 rounded-lg space-y-4">
+                    <h3 className="font-semibold text-purple-800">👑 Super Admin Controls</h3>
+
+                    {/* Role */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        User Role
+                      </label>
+                      <select
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="customer">Customer</option>
+                        <option value="store_staff">Store Staff (View Only)</option>
+                        <option value="store_admin">Store Admin (Full Access)</option>
+                        <option value="super_admin">Super Admin</option>
+                      </select>
+                    </div>
+
+                    {/* Store Assignment */}
+                    {editForm.role !== 'super_admin' && editForm.role !== 'customer' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Assign to Store
+                        </label>
+                        <select
+                          value={editForm.store}
+                          onChange={(e) => setEditForm({ ...editForm, store: e.target.value })}
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="">-- Select Store --</option>
+                          {storesData?.results?.map((store) => (
+                            <option key={store.id} value={store.id}>
+                              {store.code} - {store.name}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Store Admin/Staff harus di-assign ke toko
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Checkboxes */}
                 <div className="flex gap-6">
                   <label className="flex items-center">
@@ -409,6 +567,102 @@ const UsersPage = () => {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Hapus User?</h3>
+                <p className="text-sm text-gray-500">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <p className="font-medium">{showDeleteConfirm.full_name}</p>
+              <p className="text-sm text-gray-500">{showDeleteConfirm.email}</p>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              User yang memiliki polis atau klaim tidak dapat dihapus. Sebaiknya nonaktifkan saja dengan mengubah status <strong>Active</strong> menjadi false.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isLoading}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 transition"
+              >
+                {deleteMutation.isLoading ? 'Menghapus...' : '🗑️ Ya, Hapus'}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="px-6 py-2 border-2 border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                <span className="text-2xl">🔑</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Reset Password</h3>
+                <p className="text-sm text-gray-500">Masukkan password baru untuk user</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <p className="font-medium">{showResetPassword.full_name}</p>
+              <p className="text-sm text-gray-500">{showResetPassword.email}</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password Baru *
+              </label>
+              <input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
+                placeholder="Minimal 6 karakter"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Password akan langsung aktif. Beritahu user password barunya.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleResetPassword}
+                disabled={resetPasswordMutation.isLoading || !newPassword}
+                className="flex-1 bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 transition"
+              >
+                {resetPasswordMutation.isLoading ? 'Mereset...' : '🔑 Reset Password'}
+              </button>
+              <button
+                onClick={() => { setShowResetPassword(null); setNewPassword(''); }}
+                className="px-6 py-2 border-2 border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition"
+              >
+                Batal
+              </button>
             </div>
           </div>
         </div>

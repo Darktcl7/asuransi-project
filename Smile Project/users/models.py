@@ -12,6 +12,14 @@ from .managers import CustomUserManager
 
 class User(AbstractUser):
     
+    # Role choices for multi-store system
+    ROLE_CHOICES = [
+        ('customer', 'Customer'),           # Pelanggan biasa
+        ('store_staff', 'Store Staff'),     # Staff toko (lihat saja)
+        ('store_admin', 'Store Admin'),     # Admin toko (full CRUD toko sendiri)
+        ('super_admin', 'Super Admin'),     # Admin pusat (full access semua)
+    ]
+    
     # Hapus field 'username' bawaan, kita akan pakai 'email'
     username = None 
     email = models.EmailField(unique=True) # Jadikan email unik
@@ -24,6 +32,24 @@ class User(AbstractUser):
         primary_key=True, 
         default=uuid.uuid4, 
         editable=False
+    )
+    
+    # Role untuk multi-store system
+    role = models.CharField(
+        max_length=20, 
+        choices=ROLE_CHOICES, 
+        default='customer',
+        help_text="Role user dalam sistem"
+    )
+    
+    # Relasi ke Toko (null untuk Super Admin dan Customer yang belum assign)
+    store = models.ForeignKey(
+        'stores.Store',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        help_text="Toko tempat user bekerja/terdaftar"
     )
     
     # Field tambahan sesuai file structure.tsx Anda
@@ -51,7 +77,44 @@ class User(AbstractUser):
             models.Index(fields=['ktp_number']),  # Fast KTP search
             models.Index(fields=['is_verified', '-date_joined']),  # Filter verified users by date
             models.Index(fields=['is_active']),  # Fast active user filter
+            models.Index(fields=['role']),  # Fast role filter
+            models.Index(fields=['store', 'role']),  # Fast store + role filter
         ]
 
     def __str__(self):
         return self.email
+    
+    # ===== Helper Methods for Role Checking =====
+    
+    def is_super_admin(self):
+        """Check if user is Super Admin"""
+        return self.role == 'super_admin'
+    
+    def is_store_admin(self):
+        """Check if user is Store Admin"""
+        return self.role == 'store_admin'
+    
+    def is_store_staff(self):
+        """Check if user is Store Staff"""
+        return self.role == 'store_staff'
+    
+    def is_customer(self):
+        """Check if user is Customer"""
+        return self.role == 'customer'
+    
+    def can_access_store(self, store_id):
+        """Check if user can access a specific store"""
+        if self.is_super_admin():
+            return True
+        if self.store_id is None:
+            return False
+        return str(self.store_id) == str(store_id)
+    
+    def can_manage_store(self):
+        """Check if user can manage store data"""
+        return self.role in ['store_admin', 'super_admin']
+    
+    @property
+    def full_name(self):
+        """Return full name"""
+        return f"{self.first_name} {self.last_name}".strip() or self.email

@@ -76,6 +76,16 @@ class Policy(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT) # Lindungi polis
     tier = models.ForeignKey(PolicyTier, on_delete=models.PROTECT)
     device_package = models.ForeignKey(DevicePackage, on_delete=models.PROTECT)
+    
+    # Toko yang menjual polis ini
+    store = models.ForeignKey(
+        'stores.Store',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='policies',
+        help_text="Toko yang menjual polis ini"
+    )
 
     imei_number = models.CharField(max_length=20, unique=True)
     purchase_price = models.DecimalField(max_digits=15, decimal_places=2) # Harga beli user
@@ -103,6 +113,10 @@ class Policy(models.Model):
             models.Index(fields=['user', 'status']),
             models.Index(fields=['imei_number']),
             models.Index(fields=['expiry_date', 'status']),  # For auto-expire queries
+            models.Index(fields=['store', 'status']),  # ✅ For store admin filtering
+            models.Index(fields=['store', '-created_at']),  # ✅ For store + date sorting
+            models.Index(fields=['-created_at']),  # ✅ For date sorting
+            models.Index(fields=['policy_number']),  # ✅ For policy number search
         ]
 
     def __str__(self):

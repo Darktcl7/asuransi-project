@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../services/adminService';
+import { authService } from '../services/authService';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { Plus, Edit2, Trash2, X } from 'lucide-react';
 
@@ -10,6 +11,23 @@ const DevicesPage = () => {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editDevice, setEditDevice] = useState(null);
+
+  // Check if user is Super Admin
+  const isSuperAdmin = authService.isSuperAdmin();
+
+  // Access denied for non-Super Admin
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-600">Hanya Super Admin yang dapat mengakses halaman Devices.</p>
+          <p className="text-sm text-gray-500 mt-2">Devices adalah data global yang dikelola oleh Super Admin.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch devices
   const { data: devices, isLoading } = useQuery({
@@ -160,9 +178,8 @@ const DevicesPage = () => {
                       {formatCurrency(device.device_value)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        device.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${device.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
                         {device.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>

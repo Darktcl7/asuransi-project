@@ -22,22 +22,10 @@ class _ClaimFormScreenState extends State<ClaimFormScreen> with SingleTickerProv
   
   final _descriptionController = TextEditingController();
   
-  String? _selectedDamageType;
   DateTime _incidentDate = DateTime.now();
   bool _isLoading = false;
   List<File> _damagePhotos = []; // Multiple photos
   late AnimationController _animationController;
-
-  final List<Map<String, dynamic>> _damageTypes = [
-    {'value': 'Layar Pecah', 'icon': Icons.phone_android, 'color': Colors.red},
-    {'value': 'LCD Rusak', 'icon': Icons.tv_off, 'color': Colors.orange},
-    {'value': 'Kerusakan Air', 'icon': Icons.water_damage, 'color': Colors.blue},
-    {'value': 'Baterai Rusak', 'icon': Icons.battery_alert, 'color': Colors.amber},
-    {'value': 'Kamera Rusak', 'icon': Icons.camera_alt, 'color': Colors.purple},
-    {'value': 'Port Charging', 'icon': Icons.power_off, 'color': Colors.green},
-    {'value': 'Kehilangan', 'icon': Icons.find_in_page, 'color': Colors.deepOrange},
-    {'value': 'Lainnya', 'icon': Icons.build, 'color': Colors.grey},
-  ];
 
   @override
   void initState() {
@@ -123,12 +111,8 @@ class _ClaimFormScreenState extends State<ClaimFormScreen> with SingleTickerProv
   }
 
   Future<void> _handleSubmit() async {
+    // Validation for description is enough
     if (!_formKey.currentState!.validate()) return;
-
-    if (_selectedDamageType == null) {
-      SnackbarHelper.showError(context, 'Pilih jenis kerusakan terlebih dahulu');
-      return;
-    }
 
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -147,8 +131,6 @@ class _ClaimFormScreenState extends State<ClaimFormScreen> with SingleTickerProv
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Device: ${widget.policy.deviceBrand} ${widget.policy.deviceModel}'),
-            const SizedBox(height: 4),
-            Text('Jenis Kerusakan: $_selectedDamageType'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -224,7 +206,7 @@ class _ClaimFormScreenState extends State<ClaimFormScreen> with SingleTickerProv
       
       await _apiService.createClaim(
         policyId: widget.policy.id,
-        damageType: _selectedDamageType!,
+        damageType: 'Kerusakan Umum', // Default damage type
         damageDescription: _descriptionController.text.trim(),
         incidentDate: incidentDateStr,
         claimAmount: 0, // Admin will set the amount
@@ -268,9 +250,7 @@ class _ClaimFormScreenState extends State<ClaimFormScreen> with SingleTickerProv
               _buildPolicyInfoCard(),
               const SizedBox(height: 20),
 
-              // Damage Type Selection - Grid Cards
-              _buildDamageTypeSection(),
-              const SizedBox(height: 20),
+
 
               // Description TextArea - Compact
               _buildDescriptionSection(),
@@ -371,91 +351,7 @@ class _ClaimFormScreenState extends State<ClaimFormScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildDamageTypeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Jenis Kerusakan',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.85,
-          ),
-          itemCount: _damageTypes.length,
-          itemBuilder: (context, index) {
-            final type = _damageTypes[index];
-            final isSelected = _selectedDamageType == type['value'];
-            
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedDamageType = type['value'];
-                });
-                HapticFeedback.lightImpact();
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected 
-                      ? type['color'].withOpacity(0.15) 
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected 
-                        ? type['color'] 
-                        : Colors.grey.shade300,
-                    width: isSelected ? 2 : 1,
-                  ),
-                  boxShadow: isSelected ? [
-                    BoxShadow(
-                      color: type['color'].withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ] : [],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      type['icon'],
-                      color: isSelected ? type['color'] : Colors.grey.shade600,
-                      size: 28,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      type['value'],
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? type['color'] : Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildDescriptionSection() {
     return Column(

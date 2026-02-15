@@ -24,10 +24,15 @@ class PolicyViewSet(viewsets.ModelViewSet):
     serializer_class = PolicySerializer
 
     def get_queryset(self):
+        # OPTIMIZED with select_related
+        base_qs = Policy.objects.select_related(
+            'user', 'tier', 'device_package', 'store'
+        ).order_by('-created_at')
+        
         # User hanya bisa lihat polis miliknya
         if self.request.user.is_staff:
-            return Policy.objects.all()
-        return Policy.objects.filter(user=self.request.user)
+            return base_qs
+        return base_qs.filter(user=self.request.user)
 
     @transaction.atomic # Pastikan semua berhasil atau gagal total
     def create(self, request):

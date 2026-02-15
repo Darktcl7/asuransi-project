@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from .serializers import UserSerializer
+from stores.activity_log import ActivityLog
 import re
 
 User = get_user_model()
@@ -23,20 +24,18 @@ def is_phone_number(identifier):
     # Remove spaces, dashes, parentheses
     cleaned = re.sub(r'[\s\-\(\)\+]', '', identifier)
     
-    # Check if all digits and length 10-15
-    if cleaned.isdigit() and 10 <= len(cleaned) <= 15:
-        return True
+    # Check if it's all digits and starts with 0 or 62
+    if cleaned.isdigit() and (cleaned.startswith('0') or cleaned.startswith('62')):
+        return len(cleaned) >= 10 and len(cleaned) <= 15
+    
     return False
 
 
 def normalize_phone_number(phone):
     """
-    Normalize phone number to standard format
-    08123456789 -> 08123456789
-    628123456789 -> 08123456789
-    +628123456789 -> 08123456789
+    Normalize phone number to format: 08xxx
     """
-    # Remove spaces, dashes, parentheses, plus
+    # Remove non-digit characters first
     cleaned = re.sub(r'[\s\-\(\)\+]', '', phone)
     
     # Convert 62 prefix to 0
@@ -80,12 +79,13 @@ def custom_login(request):
         
         try:
             # Find user by phone number
-            user = User.objects.get(phone_number=normalized_phone)
+            user_obj = User.objects.get(phone_number=normalized_phone)
             
-            # Verify password
-            if not user.check_password(password):
+            # Check password
+            if user_obj.check_password(password):
+                user = user_obj
+            else:
                 user = None
-                
         except User.DoesNotExist:
             user = None
     else:
@@ -106,6 +106,16 @@ def custom_login(request):
     
     # Get or create token
     token, created = Token.objects.get_or_create(user=user)
+    
+    # Log login activity (only for admin roles)
+    if user.role in ['super_admin', 'store_admin', 'store_staff']:
+        ActivityLog.log(
+            request=request,
+            action='LOGIN',
+            target_model='User',
+            target_id=str(user.id),
+            description=f"Login: {user.email} ({user.role})"
+        )
     
     # Return success response
     return Response({

@@ -11,11 +11,15 @@ import UsersPage from './pages/UsersPage';
 import ClaimsPage from './pages/ClaimsPage';
 import PoliciesPage from './pages/PoliciesPage';
 import DevicesPage from './pages/DevicesPage';
+import StoresPage from './pages/StoresPage'; // Super Admin only
+import ActivityLogsPage from './pages/ActivityLogsPage'; // Super Admin only
 // import WalletsPage from './pages/WalletsPage'; // ❌ REMOVED - Policy balance system
 // import TopUpsPage from './pages/TopUpsPage'; // ❌ REMOVED - Policy balance system
 // import ManualTopUpPage from './pages/ManualTopUpPage'; // ❌ REMOVED - Policy balance system
 import ManualPolicyCreatePage from './pages/ManualPolicyCreatePage';
 import AdminClaimCreatePage from './pages/AdminClaimCreatePage';
+import PolicyTiersPage from './pages/PolicyTiersPage';
+import ReportsPage from './pages/ReportsPage';
 
 // Create QueryClient for React Query
 const queryClient = new QueryClient({
@@ -33,11 +37,16 @@ const ProtectedRoute = ({ children }) => {
   return authService.isAuthenticated() ? children : <Navigate to="/login" />;
 };
 
+// Dynamic basename for local dev vs production
+const getBasename = () => {
+  return import.meta.env.DEV ? '/' : '/admin_store';
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter basename="/admin_store">
+        <BrowserRouter basename={getBasename()}>
           <Routes>
             {/* Login Route */}
             <Route path="/login" element={<LoginPage />} />
@@ -54,8 +63,13 @@ function App() {
               <Route index element={<DashboardHome />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="claims" element={<ClaimsPage />} />
+              <Route path="claims/new" element={<AdminClaimCreatePage />} />
               <Route path="policies" element={<PoliciesPage />} />
+              <Route path="policy-tiers" element={<PolicyTiersPage />} />
               <Route path="devices" element={<DevicesPage />} />
+              <Route path="stores" element={<StoresPage />} /> {/* Super Admin only */}
+              <Route path="activity-logs" element={<ActivityLogsPage />} /> {/* Super Admin only */}
+              <Route path="reports" element={<ReportsPage />} /> {/* Super Admin only */}
               {/* ❌ REMOVED - Policy balance system now used */}
               {/* <Route path="wallets" element={<WalletsPage />} /> */}
               {/* <Route path="topups" element={<TopUpsPage />} /> */}
@@ -74,3 +88,5 @@ function App() {
 }
 
 export default App;
+
+

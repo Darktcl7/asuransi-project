@@ -53,6 +53,7 @@ class ApiService {
     required String phone,
     String? ktpNumber,
     required String address,
+    required String storeCode, // Kode toko untuk registrasi
   }) async {
     try {
       log('Sending register request to: $baseUrl/users/register/');
@@ -66,6 +67,7 @@ class ApiService {
         'phone_number': phone,
         'address': address,
         'birth_date': null, // Optional field
+        'store_code': storeCode, // Kode toko untuk assign ke store
       };
       
       // Add KTP only if provided
@@ -162,6 +164,38 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       throw Exception('Gagal mengambil profil');
+    }
+  }
+
+  // Update Profile
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    try {
+      log('Updating profile: $data');
+      
+      final response = await http.patch(
+        Uri.parse('$baseUrl/users/me/'),
+        headers: _headers,
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 30));
+      
+      log('Update profile response status: ${response.statusCode}');
+      log('Update profile response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        String errorMessage = error['error'] ?? 'Gagal update profil';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      log('Update profile error: $e');
+      if (e.toString().contains('TimeoutException')) {
+        throw Exception('Koneksi timeout. Cek jaringan Anda.');
+      } else if (e.toString().contains('SocketException')) {
+        throw Exception('Tidak bisa connect ke server.');
+      }
+      rethrow;
     }
   }
   

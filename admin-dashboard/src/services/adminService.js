@@ -31,6 +31,18 @@ export const adminService = {
     return response.data;
   },
 
+  async deleteUser(userId) {
+    const response = await axios.delete(`/admin/users/${userId}/`);
+    return response.data;
+  },
+
+  async resetUserPassword(userId, newPassword) {
+    const response = await axios.post(`/admin/users/${userId}/reset_password/`, {
+      new_password: newPassword
+    });
+    return response.data;
+  },
+
   // ===== CLAIMS =====
   async getClaims(params = {}) {
     const response = await axios.get('/admin/claims/', { params });
@@ -54,6 +66,19 @@ export const adminService = {
 
   async setClaimInProgress(claimId, data) {
     const response = await axios.post(`/admin/claims/${claimId}/set_in_progress/`, data);
+    return response.data;
+  },
+
+  async getReports(params = {}) {
+    const response = await axios.get('/admin/reports/', { params });
+    return response.data;
+  },
+
+  async exportReports(params = {}) {
+    const response = await axios.get('/admin/reports/export/', {
+      params,
+      responseType: 'blob'
+    });
     return response.data;
   },
 
@@ -149,6 +174,27 @@ export const adminService = {
 
   async deleteDevice(deviceId) {
     const response = await axios.delete(`/admin/devices/${deviceId}/`);
+    return response.data;
+  },
+
+  // ===== POLICY TIERS =====
+  async getPolicyTiers() {
+    const response = await axios.get('/admin/policy-tiers/');
+    return response.data;
+  },
+
+  async createPolicyTier(data) {
+    const response = await axios.post('/admin/policy-tiers/', data);
+    return response.data;
+  },
+
+  async updatePolicyTier(id, data) {
+    const response = await axios.put(`/admin/policy-tiers/${id}/`, data);
+    return response.data;
+  },
+
+  async deletePolicyTier(id) {
+    const response = await axios.delete(`/admin/policy-tiers/${id}/`);
     return response.data;
   },
 };

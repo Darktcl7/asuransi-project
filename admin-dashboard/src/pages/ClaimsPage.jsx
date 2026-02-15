@@ -371,8 +371,17 @@ const ClaimsPage = () => {
                       <p className="font-semibold">{selectedClaim.device}</p>
                     </div>
                     <div>
+                      <p className="text-gray-500 mb-1">Serial / IMEI</p>
+                      <p className="font-semibold text-orange-600">{selectedClaim.imei_number || 'N/A'}</p>
+                      <p className="text-xs text-gray-500">Bandingkan dengan foto/label device</p>
+                    </div>
+                    <div>
                       <p className="text-gray-500 mb-1">Damage Type</p>
                       <p className="font-semibold">{selectedClaim.damage_type}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 mb-1">Incident Date</p>
+                      <p className="font-semibold">{selectedClaim.incident_date || 'N/A'}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-gray-500 mb-1">Description</p>

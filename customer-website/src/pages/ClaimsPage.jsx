@@ -16,7 +16,9 @@ const ClaimsPage = () => {
     const [showClaimForm, setShowClaimForm] = useState(false);
     const [selectedPolicy, setSelectedPolicy] = useState(null);
     const [claimForm, setClaimForm] = useState({
+        damage_type: 'Kerusakan Umum', // Default value
         damage_description: '',
+        incident_date: new Date().toISOString().split('T')[0],
         photos: [],
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,12 +42,13 @@ const ClaimsPage = () => {
             ]);
 
             setClaims(claimsResponse);
-            setPolicies(policiesResponse.filter(p => p.status === 'active'));
+            const activePolicies = policiesResponse.filter(p => p.status === 'active');
+            setPolicies(activePolicies);
 
             // Set selected policy from URL if exists
             const policyId = searchParams.get('policy');
             if (policyId) {
-                const policy = policiesResponse.find(p => p.id === parseInt(policyId));
+                const policy = policiesResponse.find(p => p.id === policyId || p.id === parseInt(policyId));
                 if (policy) {
                     setSelectedPolicy(policy);
                 }
@@ -112,6 +115,17 @@ const ClaimsPage = () => {
         });
     };
 
+    const resetForm = () => {
+        setClaimForm({
+            damage_type: 'Kerusakan Umum',
+            damage_description: '',
+            incident_date: new Date().toISOString().split('T')[0],
+            photos: [],
+        });
+        setSelectedPolicy(null);
+        setShowClaimForm(false);
+    };
+
     const handleSubmitClaim = async (e) => {
         e.preventDefault();
 
@@ -130,7 +144,9 @@ const ClaimsPage = () => {
         try {
             const formData = new FormData();
             formData.append('policy', selectedPolicy.id);
+            formData.append('damage_type', 'Kerusakan Umum'); // Default fixed value
             formData.append('damage_description', claimForm.damage_description);
+            formData.append('incident_date', claimForm.incident_date);
 
             claimForm.photos.forEach((photo, index) => {
                 formData.append(`photo_${index}`, photo);
@@ -139,9 +155,7 @@ const ClaimsPage = () => {
             await apiService.submitClaim(formData);
 
             toast.success('Klaim berhasil diajukan! Tim kami akan segera memprosesnya.');
-            setShowClaimForm(false);
-            setClaimForm({ damage_description: '', photos: [] });
-            setSelectedPolicy(null);
+            resetForm();
             loadData();
         } catch (error) {
             console.error('Error submitting claim:', error);
@@ -188,11 +202,11 @@ const ClaimsPage = () => {
 
                 {/* Claim Form Modal */}
                 {showClaimForm && (
-                    <div className="modal-overlay" onClick={() => setShowClaimForm(false)}>
+                    <div className="modal-overlay" onClick={() => resetForm()}>
                         <div className="claim-form-modal animate-slideUp" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
                                 <h2>Ajukan Klaim Baru</h2>
-                                <button className="close-btn" onClick={() => setShowClaimForm(false)}>
+                                <button className="close-btn" onClick={() => resetForm()}>
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <line x1="18" y1="6" x2="6" y2="18" />
                                         <line x1="6" y1="6" x2="18" y2="18" />
@@ -201,29 +215,54 @@ const ClaimsPage = () => {
                             </div>
 
                             <form onSubmit={handleSubmitClaim} className="claim-form">
-                                {/* Policy Selection */}
+                                {/* Policy Info */}
                                 <div className="form-group">
-                                    <label className="form-label">Pilih Polis</label>
-                                    <div className="policy-select-grid">
-                                        {policies.map(policy => (
-                                            <div
-                                                key={policy.id}
-                                                className={`policy-option ${selectedPolicy?.id === policy.id ? 'selected' : ''}`}
-                                                onClick={() => setSelectedPolicy(policy)}
-                                            >
-                                                <div className="policy-option-header">
-                                                    <span className="policy-tier">{policy.tier_name || 'Standard'}</span>
-                                                    {selectedPolicy?.id === policy.id && <span className="check-icon">✓</span>}
+                                    <label className="form-label">Polis</label>
+                                    {selectedPolicy ? (
+                                        <div className="policy-info-card">
+                                            <div className="policy-info-header">
+                                                <span className="policy-icon">🛡️</span>
+                                                <div className="policy-info-details">
+                                                    <h4>{selectedPolicy.device_brand} {selectedPolicy.device_model}</h4>
+                                                    <span className="policy-number">{selectedPolicy.policy_number}</span>
                                                 </div>
-                                                <div className="policy-option-device">
-                                                    {policy.device_brand} {policy.device_model}
-                                                </div>
-                                                <div className="policy-option-balance">
-                                                    Saldo: {formatCurrency(policy.policy_balance)}
-                                                </div>
+                                                <span className="policy-tier-badge">{selectedPolicy.tier_name || 'Standard'}</span>
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="policy-balance-row">
+                                                <span>Saldo Policy:</span>
+                                                <strong>{formatCurrency(selectedPolicy.policy_balance)}</strong>
+                                            </div>
+                                            {policies.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline btn-sm"
+                                                    onClick={() => setSelectedPolicy(null)}
+                                                >
+                                                    Ganti Polis
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="policy-select-grid">
+                                            {policies.map(policy => (
+                                                <div
+                                                    key={policy.id}
+                                                    className="policy-option"
+                                                    onClick={() => setSelectedPolicy(policy)}
+                                                >
+                                                    <div className="policy-option-header">
+                                                        <span className="policy-tier">{policy.tier_name || 'Standard'}</span>
+                                                    </div>
+                                                    <div className="policy-option-device">
+                                                        {policy.device_brand} {policy.device_model}
+                                                    </div>
+                                                    <div className="policy-option-balance">
+                                                        Saldo: {formatCurrency(policy.policy_balance)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Description */}
@@ -231,10 +270,25 @@ const ClaimsPage = () => {
                                     <label className="form-label">Deskripsi Kerusakan</label>
                                     <textarea
                                         className="form-textarea"
-                                        rows="4"
-                                        placeholder="Jelaskan kerusakan yang terjadi pada perangkat Anda..."
+                                        rows="3"
+                                        placeholder="Jelaskan detail kerusakan yang terjadi..."
                                         value={claimForm.damage_description}
                                         onChange={(e) => setClaimForm({ ...claimForm, damage_description: e.target.value })}
+                                        disabled={isSubmitting}
+                                        maxLength={500}
+                                    />
+                                    <div className="char-count">{claimForm.damage_description.length}/500</div>
+                                </div>
+
+                                {/* Incident Date */}
+                                <div className="form-group">
+                                    <label className="form-label">Tanggal Kejadian</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={claimForm.incident_date}
+                                        onChange={(e) => setClaimForm({ ...claimForm, incident_date: e.target.value })}
+                                        max={new Date().toISOString().split('T')[0]}
                                         disabled={isSubmitting}
                                     />
                                 </div>
@@ -243,45 +297,47 @@ const ClaimsPage = () => {
                                 <div className="form-group">
                                     <label className="form-label">Foto Kerusakan (Maks. 5 foto, 10MB/foto)</label>
                                     <div className="photo-upload-area">
-                                        <input
-                                            type="file"
-                                            id="photos"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={handlePhotoChange}
-                                            disabled={isSubmitting || claimForm.photos.length >= 5}
-                                            hidden
-                                        />
-                                        <label htmlFor="photos" className="upload-label">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                                                <polyline points="17,8 12,3 7,8" />
-                                                <line x1="12" y1="3" x2="12" y2="15" />
-                                            </svg>
-                                            <span>Klik untuk upload foto</span>
-                                        </label>
+                                        <div className="photo-grid">
+                                            {claimForm.photos.map((photo, index) => (
+                                                <div key={index} className="photo-preview">
+                                                    <img src={URL.createObjectURL(photo)} alt={`Preview ${index + 1}`} />
+                                                    <button
+                                                        type="button"
+                                                        className="remove-photo"
+                                                        onClick={() => removePhoto(index)}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {claimForm.photos.length < 5 && (
+                                                <label className="add-photo-btn">
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={handlePhotoChange}
+                                                        disabled={isSubmitting}
+                                                        hidden
+                                                    />
+                                                    <span className="add-icon">+</span>
+                                                    <span className="add-text">Tambah</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        {claimForm.photos.length > 0 && (
-                                            <div className="photo-preview-grid">
-                                                {claimForm.photos.map((photo, index) => (
-                                                    <div key={index} className="photo-preview">
-                                                        <img src={URL.createObjectURL(photo)} alt={`Preview ${index + 1}`} />
-                                                        <button
-                                                            type="button"
-                                                            className="remove-photo"
-                                                            onClick={() => removePhoto(index)}
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                {/* Info Box */}
+                                <div className="info-box">
+                                    <span className="info-icon">ℹ️</span>
+                                    <div>
+                                        <strong>Informasi Penting</strong>
+                                        <p>Admin akan review klaim Anda, menentukan biaya perbaikan, dan memotong saldo policy sesuai biaya yang diperlukan.</p>
                                     </div>
                                 </div>
 
                                 <div className="modal-actions">
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowClaimForm(false)}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => resetForm()}>
                                         Batal
                                     </button>
                                     <button type="submit" className="btn btn-primary" disabled={isSubmitting}>

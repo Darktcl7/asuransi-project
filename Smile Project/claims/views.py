@@ -19,10 +19,14 @@ class ClaimViewSet(viewsets.ModelViewSet):
     serializer_class = ClaimSerializer
     
     def get_queryset(self):
-        # User hanya bisa lihat klaim miliknya
+        # User hanya bisa lihat klaim miliknya - OPTIMIZED
+        base_qs = Claim.objects.select_related(
+            'policy', 'policy__device_package', 'policy__tier'
+        ).order_by('-created_at')
+        
         if self.request.user.is_staff:
-            return Claim.objects.all().order_by('-created_at')
-        return Claim.objects.filter(user=self.request.user).order_by('-created_at')
+            return base_qs
+        return base_qs.filter(user=self.request.user)
     
     @transaction.atomic
     def create(self, request):
@@ -74,24 +78,26 @@ class ClaimViewSet(viewsets.ModelViewSet):
         )
         
         # 5. Handle photo uploads (multipart form data)
+        # Support both 'photos' array and 'photo_0', 'photo_1', etc. format
         photos = request.FILES.getlist('photos')
-        print(f"[DEBUG] Received FILES: {request.FILES}")
-        print(f"[DEBUG] Photos list: {photos}")
-        print(f"[DEBUG] Number of photos: {len(photos) if photos else 0}")
+        
+        # Also check for photo_0, photo_1, etc. (FormData from web)
+        if not photos:
+            photos = []
+            for key in request.FILES.keys():
+                if key.startswith('photo_') or key.startswith('photo'):
+                    photos.append(request.FILES[key])
         
         if photos:
             for photo in photos:
-                print(f"[DEBUG] Processing photo: {photo.name}, size: {photo.size}")
                 # Validate file size (max 10MB)
                 if photo.size > 10 * 1024 * 1024:
-                    print(f"[DEBUG] Photo {photo.name} exceeds 10MB, skipping")
                     continue  # Skip files > 10MB
                 
-                created_photo = ClaimPhoto.objects.create(
+                ClaimPhoto.objects.create(
                     claim=claim,
                     photo=photo
                 )
-                print(f"[DEBUG] Created ClaimPhoto: {created_photo.id}")
         
         response_data = {
             'message': 'Klaim berhasil dibuat. Menunggu review admin.',
@@ -107,10 +113,16 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
     """
     ViewSet HANYA UNTUK ADMIN.
     Untuk menyetujui atau menolak klaim.
+    OPTIMIZED for millions of records.
     """
-    queryset = Claim.objects.all().order_by('-created_at')
     serializer_class = ClaimSerializer
-    permission_classes = [IsAdminUser] # Hanya Admin/Superuser yang bisa akses
+    permission_classes = [IsAdminUser]
+    
+    def get_queryset(self):
+        # OPTIMIZED with select_related and prefetch_related
+        return Claim.objects.select_related(
+            'user', 'policy', 'policy__device_package', 'policy__tier', 'processed_by'
+        ).prefetch_related('photos').order_by('-created_at')
 
     @transaction.atomic
     @action(detail=True, methods=['post'])
@@ -316,17 +328,23 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
         """
         Get list of users who have active policies.
         Used for Admin-Assisted Claim form dropdown.
+        LIMITED to 200 users to prevent performance issues.
         """
         from django.contrib.auth import get_user_model
         User = get_user_model()
         
-        # Get users with at least one active policy
-        # Note: Policy model uses default related_name 'policy_set'
+        # Get users with at least one active policy - LIMITED for performance
         users_with_active_policies = User.objects.filter(
             policy__status='active'
-        ).distinct().values('id', 'email', 'full_name', 'phone_number')
+        ).distinct().values('id', 'email', 'first_name', 'last_name', 'phone_number')[:200]
         
-        return Response(list(users_with_active_policies))
+        # Add full_name to response
+        result = []
+        for user in users_with_active_policies:
+            user['full_name'] = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+            result.append(user)
+        
+        return Response(result)
     
     @action(detail=False, methods=['get'])
     def user_policies(self, request):
@@ -338,12 +356,13 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
         if not user_id:
             return Response({'error': 'user_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Fixed: use device_package instead of device, tier instead of tier_name
         policies = Policy.objects.filter(
             user_id=user_id,
             status='active'
-        ).select_related('device').values(
-            'id', 'policy_number', 'device__brand', 'device__model', 
-            'policy_balance', 'expiry_date', 'tier_name'
+        ).select_related('device_package', 'tier').values(
+            'id', 'policy_number', 'device_package__device_brand', 'device_package__device_model', 
+            'policy_balance', 'expiry_date', 'tier__tier_name'
         )
         
         return Response(list(policies))

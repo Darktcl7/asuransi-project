@@ -15,8 +15,11 @@ from .serializers import UserRegistrationSerializer, UserSerializer
 User = get_user_model()
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
+    
+    def get_queryset(self):
+        # OPTIMIZED with select_related for store
+        return User.objects.select_related('store').order_by('-date_joined')
 
     # Endpoint: /api/users/register/
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
@@ -33,9 +36,42 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # Endpoint: /api/users/me/
-    # (Hanya butuh token, tidak perlu ID)
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    # GET: Get current user profile
+    # PATCH: Update current user profile
+    @action(detail=False, methods=['get', 'patch'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        # 'request.user' adalah user yang sedang login
-        serializer = self.get_serializer(request.user) 
-        return Response(serializer.data)
+        user = request.user
+        
+        if request.method == 'GET':
+            # 'request.user' adalah user yang sedang login
+            serializer = self.get_serializer(user)
+            return Response(serializer.data)
+        
+        elif request.method == 'PATCH':
+            # Update profile fields
+            data = request.data
+            
+            # Fields yang boleh diupdate oleh user sendiri
+            allowed_fields = ['full_name', 'first_name', 'last_name', 'phone_number', 'address', 'ktp_number']
+            
+            for field in allowed_fields:
+                if field in data:
+                    if field == 'full_name':
+                        # Split full_name into first_name and last_name
+                        names = data['full_name'].strip().split(' ', 1)
+                        user.first_name = names[0]
+                        user.last_name = names[1] if len(names) > 1 else ''
+                    elif field == 'ktp_number':
+                        # KTP hanya bisa diinput SEKALI oleh customer
+                        # Jika sudah ada KTP, tidak bisa diubah (hanya admin yang bisa)
+                        if user.ktp_number and user.ktp_number.strip():
+                            return Response({
+                                'error': 'Nomor KTP sudah diinput sebelumnya dan tidak dapat diubah. Hubungi admin jika ingin mengubah.'
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                        setattr(user, field, data[field])
+                    else:
+                        setattr(user, field, data[field])
+            
+            user.save()
+            serializer = self.get_serializer(user)
+            return Response(serializer.data)

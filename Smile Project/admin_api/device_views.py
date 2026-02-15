@@ -5,17 +5,22 @@ from rest_framework.permissions import IsAdminUser
 from django.core.cache import cache
 from policies.models import DevicePackage
 from policies.serializers import DevicePackageSerializer
+from .permissions import CanManageDevices
 
 class AdminDeviceViewSet(viewsets.ModelViewSet):
     """
-    Admin Device Management
+    Admin Device Management - SUPER ADMIN ONLY
+    
+    Note: Devices adalah data global, hanya Super Admin yang bisa mengelola.
+    Store Admin tidak bisa akses menu ini.
+    
     GET /api/admin/devices/ - List all devices
     POST /api/admin/devices/ - Create new device
     PUT /api/admin/devices/{id}/ - Update device
     DELETE /api/admin/devices/{id}/ - Delete device
     GET /api/admin/devices/?category=handphone - Filter by category
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [CanManageDevices]  # Super Admin only
     serializer_class = DevicePackageSerializer
     
     def get_queryset(self):

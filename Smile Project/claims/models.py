@@ -48,6 +48,16 @@ class Claim(models.Model):
     whatsapp_number = models.CharField(max_length=20, null=True, blank=True, help_text="User WhatsApp number for payment notification")
     payment_date = models.DateTimeField(null=True, blank=True)
     payment_notes = models.TextField(null=True, blank=True, help_text="Payment details/notes")
+    
+    # Store reference for multi-store filtering (denormalized for performance)
+    store = models.ForeignKey(
+        'stores.Store',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='claims',
+        help_text="Store where this claim was created (from user's store)"
+    )
 
     class Meta:
         db_table = 'claims' # Sesuai ERD
@@ -59,6 +69,7 @@ class Claim(models.Model):
             models.Index(fields=['claim_number']),  # Fast claim number search
             models.Index(fields=['-created_at']),  # Fast date sorting
             models.Index(fields=['processed_by']),  # Fast admin claims lookup
+            models.Index(fields=['store', '-created_at']),  # Fast store filter
         ]
 
     def __str__(self):

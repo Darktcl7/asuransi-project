@@ -44,7 +44,8 @@ class WalletViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def history(self, request):
         wallet = request.user.wallet
-        history = WalletHistory.objects.filter(wallet=wallet).order_by('-created_at')
+        # OPTIMIZED: Limit to last 500 transactions to prevent loading millions
+        history = WalletHistory.objects.filter(wallet=wallet).order_by('-created_at')[:500]
 
         # Terapkan Paginasi (dari settings.py)
         page = self.paginate_queryset(history)

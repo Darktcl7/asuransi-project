@@ -48,9 +48,13 @@ export default function ManualPolicyCreatePage() {
       const activeDevices = devicesResponse.data.filter(d => d.is_active);
       setAllDevices(activeDevices);
 
-      // Load categories
-      const categoriesResponse = await api.get('/admin/devices/categories/');
-      setCategories(categoriesResponse.data);
+      // Extract unique categories from devices
+      const uniqueCategories = [...new Set(activeDevices.map(d => d.device_category))].sort();
+      const categoryOptions = uniqueCategories.map(cat => ({
+        value: cat,
+        label: cat.charAt(0).toUpperCase() + cat.slice(1).replace('_', ' ')
+      }));
+      setCategories(categoryOptions);
     } catch (error) {
       console.error('Load error:', error);
     }
@@ -254,8 +258,8 @@ export default function ManualPolicyCreatePage() {
       {/* Message Alert */}
       {message && (
         <div className={`p-4 rounded-lg mb-6 flex items-center gap-2 ${message.type === 'success'
-            ? 'bg-green-50 text-green-800 border border-green-200'
-            : 'bg-red-50 text-red-800 border border-red-200'
+          ? 'bg-green-50 text-green-800 border border-green-200'
+          : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
           {message.type === 'success' ? (
             <CheckCircle className="w-5 h-5" />

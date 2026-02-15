@@ -18,6 +18,7 @@ const ProfilePage = () => {
         email: '',
         phone_number: '',
         address: '',
+        ktp_number: '',
     });
 
     useEffect(() => {
@@ -34,6 +35,7 @@ const ProfilePage = () => {
                 email: response.email || '',
                 phone_number: response.phone_number || '',
                 address: response.address || '',
+                ktp_number: response.ktp_number || '',
             });
         } catch (error) {
             console.error('Error loading profile:', error);
@@ -67,6 +69,7 @@ const ProfilePage = () => {
                 full_name: formData.full_name,
                 phone_number: formData.phone_number,
                 address: formData.address,
+                ktp_number: formData.ktp_number,
             });
 
             setUser(response);
@@ -231,6 +234,90 @@ const ProfilePage = () => {
                                     disabled={!isEditing}
                                     placeholder="Masukkan alamat lengkap"
                                 />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KTP Verification Card */}
+                    <div className="profile-form-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0 }}>Verifikasi KTP</h3>
+                            {user?.is_verified ? (
+                                <span style={{
+                                    backgroundColor: '#d1fae5',
+                                    color: '#065f46',
+                                    padding: '4px 12px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '600'
+                                }}>
+                                    ✓ Terverifikasi
+                                </span>
+                            ) : (
+                                <span style={{
+                                    backgroundColor: '#fef3c7',
+                                    color: '#92400e',
+                                    padding: '4px 12px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '600'
+                                }}>
+                                    Belum Terverifikasi
+                                </span>
+                            )}
+                        </div>
+
+                        {!user?.is_verified && (
+                            <div style={{
+                                backgroundColor: '#fffbeb',
+                                border: '1px solid #f59e0b',
+                                borderRadius: '8px',
+                                padding: '12px',
+                                marginBottom: '16px'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '14px', color: '#92400e' }}>
+                                    ⚠️ Lengkapi nomor KTP untuk aktivasi akun dan dapat mengajukan klaim.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="profile-form">
+                            <div className="form-group">
+                                <label className="form-label">Nomor KTP (16 digit)</label>
+                                <input
+                                    type="text"
+                                    name="ktp_number"
+                                    className="form-input"
+                                    value={formData.ktp_number}
+                                    onChange={(e) => {
+                                        // Only allow numbers and max 16 digits
+                                        const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                                        setFormData({ ...formData, ktp_number: value });
+                                    }}
+                                    // Disabled jika: tidak editing ATAU sudah ada KTP (sudah pernah input)
+                                    disabled={!isEditing || (user?.ktp_number && user?.ktp_number.trim())}
+                                    placeholder="Contoh: 3173012345678901"
+                                    maxLength={16}
+                                    style={{
+                                        letterSpacing: '2px',
+                                        fontFamily: 'monospace',
+                                        fontSize: '16px',
+                                        backgroundColor: (user?.ktp_number && user?.ktp_number.trim()) ? '#f3f4f6' : undefined
+                                    }}
+                                />
+                                {user?.is_verified ? (
+                                    <span className="form-hint" style={{ color: '#059669' }}>
+                                        ✓ KTP sudah terverifikasi oleh admin
+                                    </span>
+                                ) : user?.ktp_number && user?.ktp_number.trim() ? (
+                                    <span className="form-hint" style={{ color: '#f59e0b' }}>
+                                        ⏳ KTP menunggu verifikasi admin. Tidak dapat diubah.
+                                    </span>
+                                ) : (
+                                    <span className="form-hint">
+                                        ⚠️ Input nomor KTP hanya dapat dilakukan SEKALI. Pastikan benar!
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

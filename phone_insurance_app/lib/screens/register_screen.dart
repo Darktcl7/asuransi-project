@@ -21,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _ktpController = TextEditingController();
   final _addressController = TextEditingController();
+  final _storeCodeController = TextEditingController();
   
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -37,6 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController.dispose();
     _ktpController.dispose();
     _addressController.dispose();
+    _storeCodeController.dispose();
     super.dispose();
   }
   
@@ -63,6 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phone: _phoneController.text.trim(),
         ktpNumber: _ktpController.text.trim(),
         address: _addressController.text.trim(),
+        storeCode: _storeCodeController.text.trim().toUpperCase(),
       );
       
       if (mounted) {
@@ -160,6 +163,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 32),
+                
+                // Store Code - PENTING!
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.store, color: Colors.orange.shade700),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Kode Toko',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Minta kode toko dari Admin saat Anda mendaftar di toko.',
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _storeCodeController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          labelText: 'Kode Toko *',
+                          hintText: 'Contoh: KUA001',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.qr_code),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Kode toko wajib diisi';
+                          }
+                          if (value.length < 6) {
+                            return 'Kode toko minimal 6 karakter';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
                 
                 // First Name
                 TextFormField(

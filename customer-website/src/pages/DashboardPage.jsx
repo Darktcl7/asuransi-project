@@ -117,21 +117,6 @@ const DashboardPage = () => {
                             <span className="stat-value">{policies.filter(p => p.status === 'active').length}</span>
                         </div>
                     </div>
-
-                    <div className="stat-card">
-                        <div className="stat-icon balance">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="2" y="4" width="20" height="16" rx="2" />
-                                <path d="M6 8h.01M6 12h.01M6 16h.01M10 8h8M10 12h8M10 16h8" />
-                            </svg>
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-label">Total Saldo</span>
-                            <span className="stat-value">
-                                {formatCurrency(policies.reduce((sum, p) => sum + (p.policy_balance || 0), 0))}
-                            </span>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Policies Section */}
@@ -183,7 +168,7 @@ const DashboardPage = () => {
                                         <div className="policy-actions">
                                             {policy.status === 'active' ? (
                                                 <Link
-                                                    to={`/claims/new?policy=${policy.id}`}
+                                                    to={`/claims?policy=${policy.id}`}
                                                     className="btn btn-primary"
                                                 >
                                                     <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -209,19 +194,13 @@ const DashboardPage = () => {
                     )}
                 </div>
 
-                {/* Quick Info */}
+                {/* Quick Info - Download App Only */}
                 <div className="quick-info animate-slideUp">
-                    <div className="info-card">
+                    <div className="info-card info-card-full">
                         <div className="info-icon">📱</div>
                         <h4>Download Aplikasi</h4>
                         <p>Kelola polis dari smartphone Anda dengan aplikasi Smile Insurance</p>
-                        <Link to="/download" className="btn btn-outline btn-sm">Download App</Link>
-                    </div>
-                    <div className="info-card">
-                        <div className="info-icon">❓</div>
-                        <h4>Butuh Bantuan?</h4>
-                        <p>Tim customer service kami siap membantu 24/7</p>
-                        <a href="mailto:support@smile-insurance.com" className="btn btn-outline btn-sm">Hubungi Kami</a>
+                        <Link to="/download" className="btn btn-primary btn-sm">Download App</Link>
                     </div>
                 </div>
             </div>

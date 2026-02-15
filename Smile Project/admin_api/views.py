@@ -30,6 +30,8 @@ from users.models import User
 from policies.models import Policy, PolicyTier, DevicePackage
 from claims.models import Claim
 from wallet.models import Wallet, TopUpTransaction, WalletHistory
+from stores.models import Store
+from stores.activity_log import ActivityLog
 from .decorators import rate_limit_api
 
 
@@ -53,49 +55,138 @@ class DashboardStatsViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
     
     def list(self, request):
-        # Try to get from cache (5 minutes)
-        cache_key = 'admin_dashboard_stats'
-        cached_stats = cache.get(cache_key)
+        from django.db.models import Sum, Count, Q
+        from django.db.models.functions import TruncMonth
+        from datetime import timedelta
         
-        if cached_stats:
-            return Response(cached_stats)
+        user = request.user
+        is_store_admin = hasattr(user, 'role') and user.role in ['store_admin', 'store_staff']
+        user_store = getattr(user, 'store', None)
         
-        # Calculate stats (optimized queries with aggregation)
-        from django.db.models import Sum
+        # Filter by store for Store Admin
+        if is_store_admin and user_store:
+            # Store Admin: Only data from their store
+            policies_qs = Policy.objects.filter(store=user_store)
+            claims_qs = Claim.objects.filter(policy__store=user_store)
+            # Use user.store instead of policy_set__store (simpler, more reliable)
+            users_qs = User.objects.filter(store=user_store)
+            # Wallets for users in this store
+            wallets_qs = Wallet.objects.filter(user__store=user_store)
+            # TopUpTransaction uses user directly, not wallet
+            topups_qs = TopUpTransaction.objects.filter(user__store=user_store)
+        else:
+            # Super Admin: All data
+            policies_qs = Policy.objects.all()
+            claims_qs = Claim.objects.all()
+            users_qs = User.objects.all()
+            wallets_qs = Wallet.objects.all()
+            topups_qs = TopUpTransaction.objects.all()
         
+        # 1. Financial Metrics
+        total_premium = policies_qs.filter(status__in=['active', 'expired']).aggregate(total=Sum('policy_price'))['total'] or 0
+        total_claim_paid = claims_qs.filter(status__in=['approved', 'completed']).aggregate(total=Sum('claim_amount'))['total'] or 0
+        loss_ratio = (total_claim_paid / total_premium * 100) if total_premium > 0 else 0
+
+        # 2. Build Stats Dictionary
         stats = {
+            'overview': {
+                'total_premium': float(total_premium),
+                'total_claim_paid': float(total_claim_paid),
+                'loss_ratio': round(loss_ratio, 2),
+                'outstanding_claims': claims_qs.filter(status='pending').count()
+            },
+            'trends': [],
             'users': {
-                'total': User.objects.count(),
-                'verified': User.objects.filter(is_verified=True).count(),
-                'active': User.objects.filter(is_active=True).count(),
-                'new_this_month': User.objects.filter(
-                    date_joined__gte=timezone.now() - timedelta(days=30)
-                ).count()
+                'total': users_qs.count(),
+                'verified': users_qs.filter(is_verified=True).count(),
+                'active': users_qs.filter(is_active=True).count(),
             },
             'policies': {
-                'total': Policy.objects.count(),
-                'active': Policy.objects.filter(status='active').count(),
-                'pending': Policy.objects.filter(status='pending').count(),
-                'expired': Policy.objects.filter(status='expired').count(),
+                'total': policies_qs.count(),
+                'active': policies_qs.filter(status='active').count(),
+                'pending': policies_qs.filter(status='pending').count(),
+                'expired': policies_qs.filter(status='expired').count(),
             },
             'claims': {
-                'total': Claim.objects.count(),
-                'pending': Claim.objects.filter(status='pending').count(),
-                'approved': Claim.objects.filter(status='approved').count(),
-                'rejected': Claim.objects.filter(status='rejected').count(),
-                'total_amount': float(Claim.objects.filter(
-                    status__in=['approved', 'completed']
-                ).aggregate(Sum('claim_amount'))['claim_amount__sum'] or 0)
+                'total': claims_qs.count(),
+                'pending': claims_qs.filter(status='pending').count(),
+                'approved': claims_qs.filter(status='approved').count(),
+                'rejected': claims_qs.filter(status='rejected').count(),
+                'total_amount': float(total_claim_paid)
             },
             'wallet': {
-                'total_balance': float(Wallet.objects.aggregate(Sum('balance'))['balance__sum'] or 0),
-                'total_topup': float(Wallet.objects.aggregate(Sum('total_topup'))['total_topup__sum'] or 0),
-                'pending_topups': TopUpTransaction.objects.filter(status='pending').count(),
-            }
+                'total_balance': float(wallets_qs.aggregate(Sum('balance'))['balance__sum'] or 0),
+                'total_topup': float(wallets_qs.aggregate(Sum('total_topup'))['total_topup__sum'] or 0),
+                'pending_topups': topups_qs.filter(status='pending').count(),
+            },
+            'top_stores': [],
+            'store_info': None  # For Store Admin context
         }
         
-        # Cache for 5 minutes
-        cache.set(cache_key, stats, 300)
+        # Add store info for Store Admin
+        if is_store_admin and user_store:
+            stats['store_info'] = {
+                'id': str(user_store.id),
+                'name': user_store.name,
+                'code': user_store.registration_code
+            }
+        
+        # 3. Calculate Trends
+        try:
+            six_months_ago = timezone.now() - timedelta(days=180)
+            
+            premium_trend = policies_qs.filter(
+                created_at__gte=six_months_ago,
+                status__in=['active', 'expired']
+            ).annotate(month=TruncMonth('created_at')).values('month').annotate(
+                total=Sum('policy_price')
+            ).order_by('month')
+            
+            claim_trend = claims_qs.filter(
+                created_at__gte=six_months_ago
+            ).annotate(month=TruncMonth('created_at')).values('month').annotate(
+                total=Sum('claim_amount')
+            ).order_by('month')
+            
+            months_map = {}
+            for p in premium_trend:
+                if p['month']:
+                    m_key = p['month'].strftime('%Y-%m')
+                    months_map[m_key] = {'name': p['month'].strftime('%b %Y'), 'premium': float(p['total'] or 0), 'claims': 0}
+            
+            for c in claim_trend:
+                if c['month']:
+                    m_key = c['month'].strftime('%Y-%m')
+                    if m_key not in months_map:
+                        months_map[m_key] = {'name': c['month'].strftime('%b %Y'), 'premium': 0, 'claims': 0}
+                    months_map[m_key]['claims'] = float(c['total'] or 0)
+            
+            if months_map:
+                sorted_keys = sorted(months_map.keys())
+                for k in sorted_keys:
+                    stats['trends'].append(months_map[k])
+        except Exception as e:
+            print(f"Error trends: {e}")
+
+        # 4. Top Stores (Only for Super Admin)
+        if not is_store_admin:
+            try:
+                # Use Policy.store relation directly
+                top_stores_qs = Store.objects.annotate(
+                    policy_count=Count('policies'),
+                    premium_value=Sum('policies__policy_price', filter=Q(policies__status='active'))
+                ).filter(is_active=True).order_by('-policy_count')[:5]
+
+                for s in top_stores_qs:
+                    stats['top_stores'].append({
+                        'id': str(s.id),
+                        'name': s.name,
+                        'code': s.registration_code,
+                        'policy_count': s.policy_count,
+                        'premium_value': float(s.premium_value or 0)
+                    })
+            except Exception as e:
+                print(f"Error calculating top stores: {e}")
         
         return Response(stats)
 
@@ -103,13 +194,38 @@ class DashboardStatsViewSet(viewsets.ViewSet):
 class AdminUserViewSet(viewsets.ModelViewSet):
     """
     Admin User Management - OPTIMIZED & RATE LIMITED
+    
+    Store Admin: Only sees users from their store
+    Super Admin: Sees all users (can filter by store)
+    
     GET /api/admin/users/?search=john&is_verified=true&page=1
+    GET /api/admin/users/?store=<store_id>  (Super Admin only)
     """
     permission_classes = [IsAdminUser]
     pagination_class = OptimizedPagination
     
     def get_queryset(self):
-        queryset = User.objects.all().order_by('-date_joined')
+        queryset = User.objects.select_related('store').order_by('-date_joined')
+        user = self.request.user
+        
+        # Store-based filtering
+        if user.role == 'super_admin':
+            # Super Admin: Can see all, optionally filter by store
+            store_filter = self.request.query_params.get('store')
+            if store_filter:
+                # Filter users yang terdaftar di store tersebut
+                queryset = queryset.filter(store_id=store_filter)
+        elif user.role in ['store_admin', 'store_staff']:
+            # Store Admin/Staff: Only users REGISTERED at their store
+            if user.store:
+                # Filter by user.store only (simpler, more reliable)
+                queryset = queryset.filter(store=user.store)
+            else:
+                # No store assigned - show nothing
+                return queryset.none()
+        else:
+            # Other roles shouldn't access this
+            return queryset.none()
         
         # Search by email, phone, name, or KTP (with XSS protection)
         search = self.request.query_params.get('search', None)
@@ -126,12 +242,12 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         
         # Filter by verification status
         is_verified = self.request.query_params.get('is_verified', None)
-        if is_verified is not None:
+        if is_verified is not None and is_verified != '':
             queryset = queryset.filter(is_verified=is_verified.lower() == 'true')
         
         # Filter by active status
         is_active = self.request.query_params.get('is_active', None)
-        if is_active is not None:
+        if is_active is not None and is_active != '':
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
         
         return queryset
@@ -146,10 +262,16 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             'email': user.email,
             'full_name': f"{user.first_name} {user.last_name}",
             'phone_number': user.phone_number,
-            'ktp_number': user.ktp_number,  # Include KTP in response
+            'ktp_number': user.ktp_number,
             'is_verified': user.is_verified,
             'is_active': user.is_active,
             'date_joined': user.date_joined,
+            'role': user.role,
+            'store': {
+                'id': str(user.store.id),
+                'code': user.store.code,
+                'name': user.store.name
+            } if user.store else None,
         } for user in page]
         
         return self.get_paginated_response(data)
@@ -160,7 +282,7 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         GET /api/admin/users/{id}/
         """
         try:
-            user = User.objects.get(pk=pk)
+            user = User.objects.select_related('store').get(pk=pk)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -176,6 +298,12 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             'is_verified': user.is_verified,
             'is_active': user.is_active,
             'date_joined': user.date_joined,
+            'role': user.role,
+            'store': {
+                'id': str(user.store.id),
+                'code': user.store.code,
+                'name': user.store.name
+            } if user.store else None,
         }
         return Response(data)
     
@@ -190,7 +318,9 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             "ktp_number": "3201234567891234",
             "address": "Jakarta",
             "is_verified": true,
-            "is_active": true
+            "is_active": true,
+            "role": "store_admin",  // Super Admin only
+            "store": "uuid-of-store"  // Super Admin only
         }
         """
         try:
@@ -228,7 +358,65 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         
         user.is_verified = is_verified
         user.is_active = is_active
+        
+        # Super Admin only: Role and Store assignment
+        if request.user.role == 'super_admin':
+            new_role = request.data.get('role', None)
+            new_store = request.data.get('store', None)
+            
+            if new_role:
+                valid_roles = ['customer', 'store_staff', 'store_admin', 'super_admin']
+                if new_role in valid_roles:
+                    old_role = user.role
+                    user.role = new_role
+                    
+                    # Log role change
+                    from stores.activity_log import ActivityLog
+                    ActivityLog.log(
+                        request=request,
+                        action='USER_UPDATE',
+                        target_model='User',
+                        target_id=str(user.id),
+                        description=f"Role changed from {old_role} to {new_role}",
+                        extra_data={'old_role': old_role, 'new_role': new_role}
+                    )
+            
+            # Store assignment (only for store_staff and store_admin)
+            if new_store and new_role in ['store_staff', 'store_admin']:
+                from stores.models import Store
+                try:
+                    store = Store.objects.get(id=new_store)
+                    user.store = store
+                    
+                    # Log store assignment
+                    from stores.activity_log import ActivityLog
+                    ActivityLog.log(
+                        request=request,
+                        action='USER_ASSIGN_STORE',
+                        target_model='User',
+                        target_id=str(user.id),
+                        description=f"User assigned to store {store.code}",
+                        extra_data={'store_id': str(store.id), 'store_code': store.code}
+                    )
+                except Store.DoesNotExist:
+                    return Response(
+                        {'error': 'Store not found'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            elif new_role in ['customer', 'super_admin']:
+                # Clear store for customer and super_admin
+                user.store = None
+        
         user.save()
+        
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='USER_UPDATE',
+            target_model='User',
+            target_id=str(user.id),
+            description=f"User diupdate: {user.email}"
+        )
         
         return Response({
             'message': 'User updated successfully',
@@ -238,7 +426,121 @@ class AdminUserViewSet(viewsets.ModelViewSet):
                 'full_name': f"{user.first_name} {user.last_name}",
                 'phone_number': user.phone_number,
                 'ktp_number': user.ktp_number,
+                'role': user.role,
+                'store': {
+                    'id': str(user.store.id),
+                    'code': user.store.code,
+                    'name': user.store.name
+                } if user.store else None
             }
+        })
+    
+    def destroy(self, request, pk=None):
+        """
+        Delete a user - SUPER ADMIN ONLY
+        DELETE /api/admin/users/{id}/
+        """
+        # Only Super Admin can delete users
+        if request.user.role != 'super_admin':
+            return Response(
+                {'error': 'Hanya Super Admin yang dapat menghapus user'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User tidak ditemukan'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Prevent deleting yourself
+        if user.id == request.user.id:
+            return Response(
+                {'error': 'Tidak dapat menghapus akun sendiri'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Prevent deleting other super admins
+        if user.role == 'super_admin':
+            return Response(
+                {'error': 'Tidak dapat menghapus Super Admin lain'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user has policies or claims
+        policy_count = user.policy_set.count()
+        claim_count = user.claim_set.count()
+        
+        if policy_count > 0 or claim_count > 0:
+            return Response({
+                'error': 'User memiliki data terkait dan tidak dapat dihapus',
+                'details': {
+                    'policies': policy_count,
+                    'claims': claim_count
+                },
+                'suggestion': 'Nonaktifkan user dengan set is_active=False sebagai gantinya'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Log before delete
+        user_email = user.email
+        ActivityLog.log(
+            request=request,
+            action='USER_DELETE',
+            target_model='User',
+            target_id=str(user.id),
+            description=f"User dihapus: {user_email}"
+        )
+        
+        user.delete()
+        
+        return Response({
+            'message': f'User {user_email} berhasil dihapus'
+        })
+    
+    @action(detail=True, methods=['post'])
+    def reset_password(self, request, pk=None):
+        """
+        Reset user password - Admin resets for user
+        POST /api/admin/users/{id}/reset_password/
+        """
+        try:
+            user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User tidak ditemukan'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        new_password = request.data.get('new_password')
+        
+        if not new_password:
+            return Response(
+                {'error': 'new_password diperlukan'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(new_password) < 6:
+            return Response(
+                {'error': 'Password minimal 6 karakter'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.set_password(new_password)
+        user.save()
+        
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='USER_UPDATE',
+            target_model='User',
+            target_id=str(user.id),
+            description=f"Password direset oleh admin untuk: {user.email}"
+        )
+        
+        return Response({
+            'message': f'Password untuk {user.email} berhasil direset'
         })
     
     @action(detail=False, methods=['get'])
@@ -267,11 +569,16 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             cell.font = header_font
             cell.alignment = header_alignment
         
-        # Get all users
-        users = User.objects.all().order_by('-date_joined')
+        # OPTIMIZED: Limit export to 10000 users and use iterator for memory efficiency
+        # For larger exports, recommend using async/background task
+        MAX_EXPORT_ROWS = 10000
+        users = User.objects.only(
+            'id', 'email', 'first_name', 'last_name', 
+            'phone_number', 'ktp_number', 'is_verified', 'is_active', 'date_joined'
+        ).order_by('-date_joined')[:MAX_EXPORT_ROWS]
         
-        # Write data
-        for user in users:
+        # Write data using iterator for memory efficiency
+        for user in users.iterator():
             ws.append([
                 str(user.id),
                 user.email,
@@ -309,8 +616,18 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Optimize with select_related dan prefetch_related untuk photos
         queryset = Claim.objects.select_related(
-            'user', 'policy', 'policy__device_package', 'policy__tier'
+            'user', 'policy', 'policy__device_package', 'policy__tier', 'policy__store'
         ).prefetch_related('photos').order_by('-created_at')
+        
+        # ✅ FIX: Store Admin only sees claims from policies in their store
+        user = self.request.user
+        if user.role in ['store_admin', 'store_staff'] and user.store:
+            queryset = queryset.filter(policy__store=user.store)
+        elif user.role == 'super_admin':
+            # Super Admin can filter by store optionally
+            store_filter = self.request.query_params.get('store')
+            if store_filter:
+                queryset = queryset.filter(policy__store_id=store_filter)
         
         # Filter by status
         status_filter = self.request.query_params.get('status', None)
@@ -338,6 +655,7 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             'user_email': claim.user.email,
             'user_name': f"{claim.user.first_name} {claim.user.last_name}",
             'device': f"{claim.policy.device_package.device_brand} {claim.policy.device_package.device_model}",
+            'imei_number': claim.policy.imei_number or 'N/A',  # IMEI untuk verifikasi
             'damage_type': claim.damage_type,
             'damage_description': claim.damage_description,
             'incident_date': claim.incident_date,
@@ -482,6 +800,15 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
         policy.claims_used += 1
         policy.save()
         
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='CLAIM_APPROVE',
+            target_model='Claim',
+            target_id=str(claim.id),
+            description=f"Klaim disetujui: {claim.claim_number} - Rp {claim_amount:,.0f}"
+        )
+        
         # Clear dashboard cache
         cache.delete('admin_dashboard_stats')
         
@@ -505,6 +832,15 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
         claim.processed_by = request.user
         claim.processed_date = timezone.now()
         claim.save()
+        
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='CLAIM_REJECT',
+            target_model='Claim',
+            target_id=str(claim.id),
+            description=f"Klaim ditolak: {claim.claim_number}"
+        )
         
         # Clear dashboard cache
         cache.delete('admin_dashboard_stats')
@@ -533,6 +869,15 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
         if admin_notes:
             claim.admin_notes = escape(admin_notes.strip())[:500]
         claim.save()
+        
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='CLAIM_UPDATE',
+            target_model='Claim',
+            target_id=str(claim.id),
+            description=f"Klaim dalam proses: {claim.claim_number}"
+        )
         
         # Clear dashboard cache
         cache.delete('admin_dashboard_stats')
@@ -585,6 +930,15 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             claim.payment_date = payment_date
         claim.save()
         
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='CLAIM_COMPLETE',
+            target_model='Claim',
+            target_id=str(claim.id),
+            description=f"Klaim selesai: {claim.claim_number}"
+        )
+        
         # Clear dashboard cache
         cache.delete('admin_dashboard_stats')
         
@@ -618,11 +972,19 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             ]
         }
         """
+        # Base queryset for pending claims
+        pending_qs = Claim.objects.filter(status='pending')
+        
+        # ✅ FIX: Filter by store for Store Admin
+        user = request.user
+        if user.role in ['store_admin', 'store_staff'] and user.store:
+            pending_qs = pending_qs.filter(policy__store=user.store)
+        
         # Get pending claims count
-        pending_count = Claim.objects.filter(status='pending').count()
+        pending_count = pending_qs.count()
         
         # Get recent 5 pending claims
-        recent_claims = Claim.objects.filter(status='pending').select_related(
+        recent_claims = pending_qs.select_related(
             'user', 'policy__device_package'
         ).order_by('-created_at')[:5]
         
@@ -727,6 +1089,15 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             # Clear dashboard cache
             cache.delete('admin_dashboard_stats')
             
+            # Log activity
+            ActivityLog.log(
+                request=request,
+                action='CLAIM_ADMIN_CREATE',
+                target_model='Claim',
+                target_id=str(claim.id),
+                description=f"Admin membuat klaim untuk: {user.email} - {claim.claim_number}"
+            )
+            
             return Response({
                 'message': f'Klaim berhasil dibuat atas nama {user.first_name} {user.last_name}'.strip() or user.email,
                 'data': {
@@ -758,8 +1129,18 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Optimize with select_related
         queryset = Policy.objects.select_related(
-            'user', 'tier', 'device_package'
+            'user', 'tier', 'device_package', 'store'
         ).order_by('-created_at')
+        
+        # ✅ FIX: Store Admin only sees policies from their store
+        user = self.request.user
+        if user.role in ['store_admin', 'store_staff'] and user.store:
+            queryset = queryset.filter(store=user.store)
+        elif user.role == 'super_admin':
+            # Super Admin can filter by store optionally
+            store_filter = self.request.query_params.get('store')
+            if store_filter:
+                queryset = queryset.filter(store_id=store_filter)
         
         # Filter by status
         status_filter = self.request.query_params.get('status', None)
@@ -993,6 +1374,11 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
         # Generate policy number
         policy_number = f"POL-{timezone.now().strftime('%Y%m%d%H%M%S')}-{user.id.hex[:6]}"
         
+        # ✅ FIX: Auto-assign store for Store Admin
+        policy_store = None
+        if request.user.role in ['store_admin', 'store_staff'] and request.user.store:
+            policy_store = request.user.store
+        
         # Create policy
         policy = Policy.objects.create(
             user=user,
@@ -1006,13 +1392,23 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
             activation_date=timezone.now().date(),
             expiry_date=timezone.now().date() + timedelta(days=tier.policy_duration_days),
             status='active',  # Auto-active for admin-created policies
-            claims_used=0
+            claims_used=0,
+            store=policy_store  # ✅ Auto-assign store from admin
         )
         
         # ==================================================================
         # NO DEDUCTION: Wallet tetap full sesuai harga device
         # Policy price TIDAK dipotong dari wallet
         # ==================================================================
+        
+        # Log activity
+        ActivityLog.log(
+            request=request,
+            action='POLICY_CREATE',
+            target_model='Policy',
+            target_id=str(policy.id),
+            description=f"Polis dibuat: {policy.policy_number} untuk {user.email} - {device_package.device_brand} {device_package.device_model}"
+        )
         
         # Clear cache
         cache.delete('admin_dashboard_stats')
@@ -1288,3 +1684,16 @@ class AdminTopUpViewSet(viewsets.ModelViewSet):
         cache.delete('admin_dashboard_stats')
         
         return Response({'message': 'Top-up approved successfully'})
+
+
+class AdminPolicyTierViewSet(viewsets.ModelViewSet):
+    """
+    CRUD Policy Tiers untuk Admin
+    GET/POST/PUT/DELETE /api/admin/policy-tiers/
+    """
+    queryset = PolicyTier.objects.all().order_by('min_price')
+    permission_classes = [IsAdminUser]
+    
+    # Import serializer local to avoid circular import
+    from policies.serializers import PolicyTierSerializer
+    serializer_class = PolicyTierSerializer

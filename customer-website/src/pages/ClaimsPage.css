@@ -207,7 +207,7 @@
     right: 4px;
     width: 20px;
     height: 20px;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(239, 68, 68, 0.9);
     color: white;
     border: none;
     border-radius: 50%;
@@ -217,6 +217,216 @@
     cursor: pointer;
     font-size: 14px;
     line-height: 1;
+}
+
+/* Policy Info Card */
+.policy-info-card {
+    background: linear-gradient(135deg, #fff7ed, #ffedd5);
+    border: 2px solid var(--primary-300);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+}
+
+.policy-info-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.policy-icon {
+    font-size: 1.5rem;
+}
+
+.policy-info-details h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--gray-900);
+}
+
+.policy-info-details .policy-number {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.policy-tier-badge {
+    margin-left: auto;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary-500);
+    color: white;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.policy-balance-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: white;
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+}
+
+.policy-balance-row span {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.policy-balance-row strong {
+    color: var(--success);
+}
+
+/* Damage Type Grid */
+.damage-type-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.damage-type-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 70px;
+}
+
+.damage-type-item:hover {
+    border-color: var(--gray-400);
+    transform: translateY(-2px);
+}
+
+.damage-type-item.selected {
+    border-width: 2px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.damage-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.damage-label {
+    font-size: 0.65rem;
+    text-align: center;
+    color: var(--gray-700);
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.damage-type-item.selected .damage-label {
+    font-weight: 700;
+}
+
+/* Character count */
+.char-count {
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 0.25rem;
+}
+
+/* Photo Grid New */
+.photo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.photo-preview {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.photo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.add-photo-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    background: var(--gray-100);
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-photo-btn:hover {
+    border-color: var(--primary-400);
+    background: var(--primary-50);
+}
+
+.add-icon {
+    font-size: 1.5rem;
+    color: var(--primary-500);
+}
+
+.add-text {
+    font-size: 0.65rem;
+    color: var(--gray-600);
+}
+
+/* Info Box */
+.info-box {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: var(--radius);
+    margin-top: 1rem;
+}
+
+.info-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.info-box strong {
+    display: block;
+    font-size: 0.875rem;
+    color: #c2410c;
+    margin-bottom: 0.25rem;
+}
+
+.info-box p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #9a3412;
+    line-height: 1.4;
+}
+
+/* Claim damage type display */
+.claim-damage-type {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.claim-damage-type .damage-label {
+    color: var(--gray-500);
+}
+
+.claim-damage-type .damage-value {
+    color: var(--gray-800);
+    font-weight: 600;
 }
 
 .modal-actions {
@@ -406,6 +616,28 @@
 
     .policy-select-grid {
         grid-template-columns: 1fr;
+    }
+
+    .damage-type-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.4rem;
+    }
+
+    .damage-type-item {
+        padding: 0.5rem 0.25rem;
+        min-height: 60px;
+    }
+
+    .damage-icon {
+        font-size: 1.25rem;
+    }
+
+    .damage-label {
+        font-size: 0.55rem;
+    }
+
+    .photo-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 
     .claim-policy {

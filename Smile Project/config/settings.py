@@ -13,15 +13,20 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
-SECRET_KEY = 'django-insecure-YOUR-SECRET-KEY-HERE' # Ganti dengan key Anda
-DEBUG = True
+# SECURITY: Read from environment variables (not hardcoded!)
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-change-me')
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.100.4']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
 
 # Application definition
@@ -46,6 +51,7 @@ INSTALLED_APPS = [
     'claims',
     'admin_api',  # Admin API untuk dashboard
     'notifications',  # In-app notifications
+    'stores',  # Multi-store system (NEW)
 ]
 
 MIDDLEWARE = [
@@ -88,16 +94,16 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # ===================================================================
-# Konfigurasi untuk PostgreSQL yang Anda buat
+# Konfigurasi untuk PostgreSQL - BACA DARI ENVIRONMENT VARIABLES
 # ===================================================================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'insurance_db',       
-        'USER': 'postgres',           
-        'PASSWORD': 'Rossoneri277',       
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv('DB_NAME', 'insurance_db'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
 
         # OPTIMASI JUTAAN DATA:
         # Mengaktifkan connection pooling.

@@ -1,9 +1,7 @@
 // lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
-import '../services/biometric_service.dart';
 import '../utils/snackbar_helper.dart'; 
 
 class LoginScreen extends StatefulWidget {
@@ -16,51 +14,12 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
-  final BiometricService _biometricService = BiometricService();
   
   // Controller for email OR phone number
   final _identifierController = TextEditingController(); 
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _biometricAvailable = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkBiometric();
-  }
-
-  Future<void> _checkBiometric() async {
-    final available = await _biometricService.isBiometricAvailable();
-    if (mounted) {
-      setState(() => _biometricAvailable = available);
-    }
-  }
-
-  Future<void> _saveCredentials(String email, String password) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_email', email);
-      await prefs.setString('saved_password', password);
-    } catch (e) {
-      print('Error saving credentials: $e');
-    }
-  }
-
-  Future<Map<String, String>?> _loadCredentials() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString('saved_email');
-      final password = prefs.getString('saved_password');
-      
-      if (email != null && password != null) {
-        return {'email': email, 'password': password};
-      }
-    } catch (e) {
-      print('Error loading credentials: $e');
-    }
-    return null;
-  }
+  bool _obscurePassword = true;
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -74,12 +33,6 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      // Save credentials untuk biometric login
-      await _saveCredentials(
-        _identifierController.text.trim(),
-        _passwordController.text,
-      );
-
       // Jika sukses, navigasi ke Dashboard
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/dashboard');
@@ -89,62 +42,6 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackbarHelper.showError(
           context, 
           'Login Gagal: ${e.toString().replaceAll('Exception: ', '')}',
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _loginWithBiometric() async {
-    // Show loading
-    setState(() => _isLoading = true);
-    
-    try {
-      // Authenticate dengan fingerprint
-      final authenticated = await _biometricService.authenticate(
-        reason: 'Login ke Smile by SPC',
-      );
-      
-      if (!authenticated) {
-        if (mounted) {
-          SnackbarHelper.showError(context, 'Autentikasi gagal');
-          setState(() => _isLoading = false);
-        }
-        return;
-      }
-
-      // Load saved credentials
-      final credentials = await _loadCredentials();
-      
-      if (credentials == null) {
-        if (mounted) {
-          SnackbarHelper.showWarning(
-            context, 
-            'Belum ada kredensial tersimpan. Login manual terlebih dahulu.',
-          );
-          setState(() => _isLoading = false);
-        }
-        return;
-      }
-
-      // Login dengan saved credentials
-      await _apiService.login(
-        identifier: credentials['email']!,
-        password: credentials['password']!,
-      );
-
-      // Navigate ke dashboard
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(
-          context,
-          'Login gagal: ${e.toString().replaceAll('Exception: ', '')}',
         );
       }
     } finally {
@@ -273,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     helperText: 'Masukkan email atau nomor HP Anda',
                     helperStyle: const TextStyle(fontSize: 11),
                   ),
-                  keyboardType: TextInputType.text, // Accept both email and phone
+                  keyboardType: TextInputType.text,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Email atau nomor HP wajib diisi';
@@ -282,13 +179,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
+                
+                // Password Field with visibility toggle
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                  ),
                   validator: (value) => (value == null || value.isEmpty) ? 'Password wajib diisi' : null,
                 ),
                 const SizedBox(height: 8),
+                
                 // Forgot Password Link
                 Align(
                   alignment: Alignment.centerRight,
@@ -315,6 +227,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.indigo,
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
@@ -324,42 +239,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                
-                // Biometric Login (tampil jika device support)
-                if (_biometricAvailable) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'atau',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  Column(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.indigo.shade50,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: _isLoading ? null : _loginWithBiometric,
-                          icon: const Icon(Icons.fingerprint, size: 48),
-                          color: Colors.indigo,
-                          tooltip: 'Login dengan Biometric',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Login dengan Fingerprint',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
                 
                 const SizedBox(height: 24),
                 

@@ -9,6 +9,7 @@ const RegisterPage = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const [formData, setFormData] = useState({
+        store_code: '',
         full_name: '',
         email: '',
         phone_number: '',
@@ -53,6 +54,11 @@ const RegisterPage = () => {
             return false;
         }
 
+        if (!formData.store_code || formData.store_code.length < 6) {
+            toast.error('Kode toko wajib diisi (min. 6 karakter)');
+            return false;
+        }
+
         return true;
     };
 
@@ -69,6 +75,7 @@ const RegisterPage = () => {
                 email: formData.email,
                 phone_number: formData.phone_number,
                 password: formData.password,
+                store_code: formData.store_code.toUpperCase(),
             });
 
             toast.success('Registrasi berhasil! Silakan login.');
@@ -102,6 +109,33 @@ const RegisterPage = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="auth-form">
+                            {/* Store Code - IMPORTANT */}
+                            <div className="form-group" style={{ backgroundColor: '#fff7ed', padding: '16px', borderRadius: '12px', border: '1px solid #fed7aa', marginBottom: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '20px', marginRight: '8px' }}>🏪</span>
+                                    <label className="form-label" style={{ margin: 0, fontWeight: 'bold', color: '#c2410c' }}>Kode Toko</label>
+                                </div>
+                                <p style={{ fontSize: '13px', color: '#78716c', marginBottom: '12px' }}>
+                                    Minta kode toko dari Admin saat Anda mendaftar di toko.
+                                </p>
+                                <div className="input-wrapper">
+                                    <svg className="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                                        <path d="M7 7h3v3H7zM14 7h3v3h-3zM7 14h3v3H7z" />
+                                    </svg>
+                                    <input
+                                        type="text"
+                                        name="store_code"
+                                        className="form-input"
+                                        placeholder="Contoh: KUA001"
+                                        value={formData.store_code}
+                                        onChange={handleChange}
+                                        disabled={isLoading}
+                                        style={{ textTransform: 'uppercase' }}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="form-group">
                                 <label className="form-label">Nama Lengkap</label>
                                 <div className="input-wrapper">
