@@ -80,10 +80,16 @@ class Store(models.Model):
     
     @classmethod
     def get_by_registration_code(cls, reg_code):
-        """Find store by registration code (case-insensitive)"""
+        """Find store by registration code OR store code (case-insensitive)"""
+        if not reg_code:
+            return None
+        
+        reg_code = reg_code.strip()
         try:
+            # First try registration_code
             return cls.objects.get(
-                registration_code__iexact=reg_code.strip(),
+                models.Q(registration_code__iexact=reg_code) |
+                models.Q(code__iexact=reg_code),
                 is_active=True
             )
         except cls.DoesNotExist:

@@ -30,28 +30,26 @@ class ClaimSerializer(serializers.ModelSerializer):
     # Include photos
     photos = ClaimPhotoSerializer(many=True, read_only=True)
     
-    # Add flat fields for Flutter (allow null)
-    device_brand = serializers.CharField(
-        source='policy.device_package.device_brand', 
-        read_only=True, 
-        allow_null=True,
-        default=''
-    )
-    device_model = serializers.CharField(
-        source='policy.device_package.device_model', 
-        read_only=True,
-        allow_null=True,
-        default=''
-    )
-    
-    # Add fields for Admin Dashboard
+    # Add flat fields for Frontend (Defensive)
+    device_brand = serializers.SerializerMethodField()
+    device_model = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
-    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_email = serializers.SerializerMethodField()
     device = serializers.SerializerMethodField()
     
     def get_user_name(self, obj):
         """Get user full name"""
-        return f"{obj.user.first_name} {obj.user.last_name}".strip() or obj.user.email
+        try:
+            if not obj.user: return "N/A"
+            return f"{obj.user.first_name} {obj.user.last_name}".strip() or obj.user.email
+        except:
+            return "N/A"
+
+    def get_user_email(self, obj):
+        try:
+            return obj.user.email if obj.user else "N/A"
+        except:
+            return "N/A"
     
     def get_device(self, obj):
         """Get device info (Brand + Model)"""
@@ -60,6 +58,18 @@ class ClaimSerializer(serializers.ModelSerializer):
             return f"{pkg.device_brand} {pkg.device_model}"
         except:
             return "N/A"
+
+    def get_device_brand(self, obj):
+        try:
+            return obj.policy.device_package.device_brand
+        except:
+            return ""
+
+    def get_device_model(self, obj):
+        try:
+            return obj.policy.device_package.device_model
+        except:
+            return ""
 
     class Meta:
         model = Claim

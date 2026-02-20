@@ -83,6 +83,8 @@ class UserSerializer(serializers.ModelSerializer):
     
     # Store info for multi-store system
     store = serializers.SerializerMethodField()
+    
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -103,6 +105,10 @@ class UserSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
     
+    def get_role(self, obj):
+        """Show actual DB role"""
+        return obj.role
+
     def get_store(self, obj):
         """Return store info if user has a store"""
         if obj.store:

@@ -9,6 +9,7 @@ const PolicyTiersPage = () => {
     const [showModal, setShowModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingTier, setEditingTier] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -68,12 +69,17 @@ const PolicyTiersPage = () => {
         setShowModal(true);
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Apakah Anda yakin ingin menghapus tier ini?')) return;
+    const handleDelete = (tier) => {
+        setDeleteConfirm(tier);
+    };
+
+    const executeDelete = async () => {
+        if (!deleteConfirm) return;
 
         try {
-            await adminService.deletePolicyTier(id);
+            await adminService.deletePolicyTier(deleteConfirm.id);
             toast.success('Tier berhasil dihapus');
+            setDeleteConfirm(null);
             loadData();
         } catch (error) {
             console.error('Error deleting tier:', error);
@@ -197,7 +203,7 @@ const PolicyTiersPage = () => {
                                                     </svg>
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete(tier.id)}
+                                                    onClick={() => handleDelete(tier)}
                                                     className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
                                                     title="Hapus"
                                                 >
@@ -334,6 +340,37 @@ const PolicyTiersPage = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+                        <div className="p-8 text-center bg-gray-50 border-b">
+                            <div className="w-20 h-20 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-4 text-4xl">
+                                🗑️
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Tier Polis?</h3>
+                            <p className="text-sm text-gray-600">
+                                Apakah Anda yakin ingin menghapus tier <strong>{deleteConfirm.tier_name}</strong>?
+                                <br />Tindakan ini tidak dapat dibatalkan jika sudah ada polis yang menggunakan tier ini.
+                            </p>
+                        </div>
+                        <div className="p-6 flex flex-col gap-2">
+                            <button
+                                onClick={executeDelete}
+                                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2"
+                            >
+                                Ya, Hapus Tier
+                            </button>
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition"
+                            >
+                                Batalkan
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

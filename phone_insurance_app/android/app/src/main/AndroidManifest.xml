@@ -13,7 +13,7 @@
     
     <application
         android:usesCleartextTraffic="true"
-        android:label="phone_insurance_app"
+        android:label="Smile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

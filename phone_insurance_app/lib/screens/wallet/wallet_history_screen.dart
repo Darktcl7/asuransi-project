@@ -101,11 +101,19 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
   }
 
   String _formatCurrency(double value) {
-    try {
-      return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
-    } catch (e) {
-      return 'Rp 0';
+    if (value == null) return 'Rp 0';
+    String str = value.toInt().toString();
+    String result = "";
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      result = str[i] + result;
+      count++;
+      if (count == 3 && i > 0) {
+        result = "." + result;
+        count = 0;
+      }
     }
+    return 'Rp $result';
   }
 
   @override

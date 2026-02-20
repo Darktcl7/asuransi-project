@@ -87,11 +87,19 @@ class _PolicyPurchaseScreenState extends State<PolicyPurchaseScreen> {
   }
 
   String _formatCurrency(double value) {
-    final formatter = NumberFormat.currency(
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-    return formatter.format(value);
+    if (value == null) return 'Rp 0';
+    String str = value.toInt().toString();
+    String result = "";
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      result = str[i] + result;
+      count++;
+      if (count == 3 && i > 0) {
+        result = "." + result;
+        count = 0;
+      }
+    }
+    return 'Rp $result';
   }
 
   double get _currentBalance {

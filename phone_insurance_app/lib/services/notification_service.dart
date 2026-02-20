@@ -4,10 +4,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notification.dart';
+import 'api_service.dart';
 
 class NotificationService {
-  // ✅ PRODUCTION SERVER:
-  static const String baseUrl = 'http://148.230.97.130/api/notifications';
+  // Use same base URL as ApiService
+  static String get baseUrl => '${ApiService.baseUrl}/notifications';
 
   // Get token from SharedPreferences
   Future<String?> _getToken() async {

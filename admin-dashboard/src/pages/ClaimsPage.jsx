@@ -220,6 +220,7 @@ const ClaimsPage = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Claim #</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal Klaim</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Damage</th>
@@ -233,6 +234,12 @@ const ClaimsPage = () => {
                     <tr key={claim.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {claim.claim_number}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {claim.created_at ? new Date(claim.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                        <div className="text-xs text-gray-400">
+                          {claim.created_at ? new Date(claim.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{claim.user_name}</div>

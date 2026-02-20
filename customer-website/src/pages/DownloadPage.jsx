@@ -52,7 +52,7 @@ const DownloadPage = () => {
                                         <line x1="12" y1="15" x2="12" y2="3" />
                                     </svg>
                                     Download APK
-                                    <span className="btn-meta">v1.0.0 • 48.4 MB</span>
+                                    <span className="btn-meta">v2.0.0 • ~50 MB</span>
                                 </button>
 
                                 <button
@@ -296,7 +296,7 @@ const DownloadPage = () => {
                                 fgColor="#1f2937"
                                 bgColor="#ffffff"
                             />
-                            <span className="qr-label">Smile Insurance v1.0.0</span>
+                            <span className="qr-label">Smile Insurance v2.0.0</span>
                         </div>
                     </div>
                 </div>

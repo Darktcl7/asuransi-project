@@ -2,8 +2,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminService } from '../services/adminService';
+import { useToast } from '../components/Toast';
 
 const ReportsPage = () => {
+    const toast = useToast();
     const [dateRange, setDateRange] = useState({
         startDate: '',
         endDate: ''
@@ -34,7 +36,7 @@ const ReportsPage = () => {
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Export failed:', error);
-            alert('Gagal export laporan');
+            toast.error('Gagal export laporan');
         }
     };
 

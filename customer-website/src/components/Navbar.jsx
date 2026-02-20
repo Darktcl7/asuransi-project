@@ -66,13 +66,6 @@ const Navbar = () => {
                                 </svg>
                                 Dashboard
                             </Link>
-                            <Link to="/claims" className={`nav-link ${isActive('/claims') ? 'active' : ''}`}>
-                                <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M9 12l2 2 4-4" />
-                                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Klaim
-                            </Link>
                             <Link to="/notifications" className={`nav-link notification-link ${isActive('/notifications') ? 'active' : ''}`}>
                                 <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -160,9 +153,6 @@ const Navbar = () => {
                         </div>
                         <Link to="/dashboard" className="mobile-nav-link" onClick={() => setIsMenuOpen(false)}>
                             Dashboard
-                        </Link>
-                        <Link to="/claims" className="mobile-nav-link" onClick={() => setIsMenuOpen(false)}>
-                            Riwayat Klaim
                         </Link>
                         <Link to="/notifications" className="mobile-nav-link" onClick={() => setIsMenuOpen(false)}>
                             Notifikasi

@@ -85,11 +85,8 @@ const ClaimsPage = () => {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount || 0);
+        if (amount === undefined || amount === null) return 'Rp 0';
+        return 'Rp ' + Number(amount).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     };
 
     const handlePhotoChange = (e) => {
@@ -382,6 +379,9 @@ const ClaimsPage = () => {
                                             <div className="policy-badge">
                                                 <span className="policy-emoji">🛡️</span>
                                                 <span>{claim.policy_tier || 'Standard'}</span>
+                                            </div>
+                                            <div className="store-badge-mini" style={{ fontSize: '0.75rem', color: 'var(--primary-600)', marginTop: '0.25rem' }}>
+                                                🏪 {claim.store_name || 'Smile Center'}
                                             </div>
                                             <span className="policy-device">{claim.device_brand} {claim.device_model}</span>
                                         </div>

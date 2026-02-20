@@ -103,7 +103,18 @@ class Claim {
   
   String get formattedClaimAmount {
     try {
-      return 'Rp ${claimAmount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+      String str = claimAmount.toInt().toString();
+      String result = "";
+      int count = 0;
+      for (int i = str.length - 1; i >= 0; i--) {
+        result = str[i] + result;
+        count++;
+        if (count == 3 && i > 0) {
+          result = "." + result;
+          count = 0;
+        }
+      }
+      return 'Rp $result';
     } catch (e) {
       return 'Rp 0';
     }

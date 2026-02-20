@@ -75,7 +75,12 @@ class CanManageDevices(BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        # Only Super Admin can manage devices
+            
+        # Store Admin/Staff can VIEW (list/retrieve)
+        if request.user.role in ['store_admin', 'store_staff'] and request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+            
+        # Only Super Admin can manage (POST, PUT, DELETE)
         return request.user.role == 'super_admin'
 
 

@@ -73,17 +73,18 @@ flutter:
 # App Icon Configuration
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
   image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#FF6B00"
+  adaptive_icon_background: "#5E35B1"
   adaptive_icon_foreground: "assets/icon/app_icon.png"
 
+# App Icon Configuration
 # Splash Screen Configuration
 flutter_native_splash:
-  color: "#FF6B00"
+  color: "#5E35B1"
   image: "assets/icon/app_icon.png"
   android: true
-  ios: false
+  ios: true
   fullscreen: true
 
   # An image asset can refer to one or more resolution-specific "variants", see

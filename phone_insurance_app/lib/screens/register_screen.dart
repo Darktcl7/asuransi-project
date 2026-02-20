@@ -19,7 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _ktpController = TextEditingController();
+
   final _addressController = TextEditingController();
   final _storeCodeController = TextEditingController();
   
@@ -36,7 +36,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
-    _ktpController.dispose();
+
     _addressController.dispose();
     _storeCodeController.dispose();
     super.dispose();
@@ -63,7 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         phone: _phoneController.text.trim(),
-        ktpNumber: _ktpController.text.trim(),
+
         address: _addressController.text.trim(),
         storeCode: _storeCodeController.text.trim().toUpperCase(),
       );
@@ -298,32 +298,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
                 
-                // KTP Number
-                TextFormField(
-                  controller: _ktpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 16,
-                  decoration: const InputDecoration(
-                    labelText: 'Nomor KTP *',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.credit_card),
-                    hintText: '16 digit nomor KTP',
-                    counterText: '',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Nomor KTP wajib diisi';
-                    }
-                    if (value.length != 16) {
-                      return 'Nomor KTP harus 16 digit';
-                    }
-                    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-                      return 'Nomor KTP hanya boleh angka';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+
                 
                 // Address
                 TextFormField(

@@ -135,76 +135,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.orange,
                 ),
                 _buildInfoTile(
-                  icon: Icons.account_balance_wallet,
-                  label: 'Saldo Wallet',
-                  value: _formatCurrency(_user?.walletBalance ?? 0),
+                  icon: Icons.store,
+                  label: 'Toko Terdaftar',
+                  value: _user?.storeName != null 
+                    ? '${_user!.storeName} (${_user!.storeCode})' 
+                    : '-',
                   color: Colors.green,
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // KTP Verification Section
-            _buildSection(
-              title: 'Verifikasi KTP',
-              children: [
-                // Verification Status Badge
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: (_user?.isVerified ?? false) 
-                        ? Colors.green.shade50 
-                        : Colors.amber.shade50,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade200),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        (_user?.isVerified ?? false) 
-                            ? Icons.verified_user 
-                            : Icons.pending,
-                        color: (_user?.isVerified ?? false) 
-                            ? Colors.green 
-                            : Colors.amber.shade700,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              (_user?.isVerified ?? false) 
-                                  ? 'Akun Terverifikasi ✓' 
-                                  : 'Belum Terverifikasi',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: (_user?.isVerified ?? false) 
-                                    ? Colors.green.shade700 
-                                    : Colors.amber.shade800,
-                              ),
-                            ),
-                            Text(
-                              (_user?.isVerified ?? false) 
-                                  ? 'KTP Anda sudah diverifikasi admin' 
-                                  : 'Lengkapi KTP untuk verifikasi',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // KTP Number Display/Input
-                _buildKtpTile(),
               ],
             ),
 
@@ -250,8 +187,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildInfoTile(
                   icon: Icons.phone_android,
                   label: 'Versi Aplikasi',
-                  value: '1.0.0',
-                  color: Colors.grey,
+                  value: '1.0.2',
+                  color: Colors.blueGrey,
                 ),
               ],
             ),
@@ -286,6 +223,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             const SizedBox(height: 32),
+            
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -462,213 +401,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildKtpTile() {
-    final hasKtp = _user?.ktpNumber != null && _user!.ktpNumber!.isNotEmpty;
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.credit_card, color: Colors.teal, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nomor KTP',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    Text(
-                      hasKtp ? _user!.ktpNumber! : 'Belum diisi',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: hasKtp ? Colors.black87 : Colors.red.shade400,
-                        letterSpacing: hasKtp ? 2 : 0,
-                        fontFamily: hasKtp ? 'monospace' : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!hasKtp)
-                ElevatedButton.icon(
-                  onPressed: () => _showInputKtpDialog(),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Input KTP'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                ),
-            ],
-          ),
-          if (!hasKtp)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_amber, color: Colors.amber.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Input KTP hanya dapat dilakukan SEKALI. Pastikan nomor benar!',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _showInputKtpDialog() {
-    final ktpController = TextEditingController();
-    bool isLoading = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Input Nomor KTP'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_amber, color: Colors.amber.shade700),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'PERHATIAN: Nomor KTP hanya bisa diinput SEKALI dan tidak dapat diubah!',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: ktpController,
-                keyboardType: TextInputType.number,
-                maxLength: 16,
-                style: const TextStyle(
-                  letterSpacing: 2,
-                  fontFamily: 'monospace',
-                  fontSize: 18,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Nomor KTP (16 digit)',
-                  hintText: '3173012345678901',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.credit_card),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(context),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      final ktp = ktpController.text.trim();
-                      if (ktp.length != 16) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Nomor KTP harus 16 digit'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() => isLoading = true);
-
-                      try {
-                        await _apiService.updateProfile({'ktp_number': ktp});
-                        Navigator.pop(context);
-                        await _loadUserData();
-                        
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Nomor KTP berhasil disimpan!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        setState(() => isLoading = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-              child: isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Simpan KTP'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showAboutDialog() {
     showDialog(
       context: context,
@@ -686,7 +418,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Versi 1.0.0',
+                'Versi 1.0.2',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 16),

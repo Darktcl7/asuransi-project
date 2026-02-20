@@ -5,13 +5,23 @@ import { apiService } from '../services/apiService';
 import { authService } from '../services/authService';
 import { useToast } from '../components/Toast';
 import './DashboardPage.css';
+import './ClaimsPage.css';
 
 const DashboardPage = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const [user, setUser] = useState(null);
     const [policies, setPolicies] = useState([]);
+    const [claims, setClaims] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showClaimForm, setShowClaimForm] = useState(false);
+    const [selectedPolicy, setSelectedPolicy] = useState(null);
+    const [claimForm, setClaimForm] = useState({
+        damage_description: '',
+        incident_date: new Date().toISOString().split('T')[0],
+        photos: [],
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -20,13 +30,15 @@ const DashboardPage = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [userResponse, policiesResponse] = await Promise.all([
+            const [userResponse, policiesResponse, claimsResponse] = await Promise.all([
                 apiService.getUserProfile(),
                 apiService.getPolicies(),
+                apiService.getClaims(),
             ]);
 
             setUser(userResponse);
             setPolicies(policiesResponse);
+            setClaims(claimsResponse);
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             if (error.response?.status === 401) {
@@ -40,7 +52,7 @@ const DashboardPage = () => {
         }
     };
 
-    const getStatusBadge = (status) => {
+    const getPolicyStatusBadge = (status) => {
         const statusMap = {
             active: { label: 'Aktif', class: 'badge-success' },
             pending: { label: 'Pending', class: 'badge-pending' },
@@ -50,12 +62,92 @@ const DashboardPage = () => {
         return statusMap[status] || { label: status, class: 'badge-info' };
     };
 
+    const getClaimStatusBadge = (status) => {
+        const statusMap = {
+            pending: { label: 'Menunggu', class: 'badge-pending', icon: '⏳' },
+            approved: { label: 'Disetujui', class: 'badge-success', icon: '✅' },
+            rejected: { label: 'Ditolak', class: 'badge-error', icon: '❌' },
+            processing: { label: 'Diproses', class: 'badge-info', icon: '🔄' },
+        };
+        return statusMap[status] || { label: status, class: 'badge-info', icon: '📋' };
+    };
+
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount || 0);
+        if (!amount && amount !== 0) return 'Rp 0';
+        const formatted = Math.floor(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        return `Rp ${formatted}`;
+    };
+
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    };
+
+    const handlePhotoChange = (e) => {
+        const files = Array.from(e.target.files);
+        const validFiles = files.filter(file => {
+            if (file.size > 10 * 1024 * 1024) {
+                toast.warning(`${file.name} melebihi 10MB dan tidak akan diupload`);
+                return false;
+            }
+            return true;
+        });
+        setClaimForm({
+            ...claimForm,
+            photos: [...claimForm.photos, ...validFiles].slice(0, 5),
+        });
+    };
+
+    const removePhoto = (index) => {
+        setClaimForm({
+            ...claimForm,
+            photos: claimForm.photos.filter((_, i) => i !== index),
+        });
+    };
+
+    const resetClaimForm = () => {
+        setClaimForm({
+            damage_description: '',
+            incident_date: new Date().toISOString().split('T')[0],
+            photos: [],
+        });
+        setSelectedPolicy(null);
+        setShowClaimForm(false);
+    };
+
+    const handleSubmitClaim = async (e) => {
+        e.preventDefault();
+        if (!selectedPolicy) {
+            toast.error('Pilih polis terlebih dahulu');
+            return;
+        }
+        if (!claimForm.damage_description.trim()) {
+            toast.error('Mohon isi deskripsi kerusakan');
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const formData = new FormData();
+            formData.append('policy', selectedPolicy.id);
+            formData.append('damage_type', 'Kerusakan Umum');
+            formData.append('damage_description', claimForm.damage_description);
+            formData.append('incident_date', claimForm.incident_date);
+            claimForm.photos.forEach((photo, index) => {
+                formData.append(`photo_${index}`, photo);
+            });
+            await apiService.submitClaim(formData);
+            toast.success('Klaim berhasil diajukan!');
+            resetClaimForm();
+            loadData();
+        } catch (error) {
+            console.error('Error submitting claim:', error);
+            toast.error(error.response?.data?.detail || 'Gagal mengajukan klaim.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (isLoading) {
@@ -78,16 +170,7 @@ const DashboardPage = () => {
                 <div className="dashboard-header animate-slideDown">
                     <div className="welcome-section">
                         <h1>Selamat Datang, {user?.full_name || 'Pengguna'}! 👋</h1>
-                        <p>Kelola polis dan ajukan klaim dengan mudah</p>
-                    </div>
-                    <div className="header-actions">
-                        <Link to="/claims" className="btn btn-secondary">
-                            <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M9 12l2 2 4-4" />
-                                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Riwayat Klaim
-                        </Link>
+                        <p>{user?.store?.name ? `Terdaftar di toko: ${user.store.name}` : 'Kelola polis dan ajukan klaim dengan mudah'}</p>
                     </div>
                 </div>
 
@@ -95,7 +178,7 @@ const DashboardPage = () => {
                 <div className="stats-grid animate-slideUp">
                     <div className="stat-card">
                         <div className="stat-icon policies">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </div>
@@ -106,93 +189,232 @@ const DashboardPage = () => {
                     </div>
 
                     <div className="stat-card">
-                        <div className="stat-icon active">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                                <polyline points="22,4 12,14.01 9,11.01" />
+                        <div className="stat-icon balance">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                             </svg>
                         </div>
                         <div className="stat-info">
-                            <span className="stat-label">Polis Aktif</span>
-                            <span className="stat-value">{policies.filter(p => p.status === 'active').length}</span>
+                            <span className="stat-label">Riwayat Klaim</span>
+                            <span className="stat-value">{claims.length}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Policies Section */}
-                <div className="policies-section animate-slideUp">
-                    <div className="section-header">
-                        <h2>Polis Anda</h2>
-                        <span className="section-note">Dikelola oleh Admin</span>
-                    </div>
-
-                    {policies.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="empty-icon">🛡️</div>
-                            <h3>Belum Ada Polis</h3>
-                            <p>Admin akan menambahkan polis untuk perangkat Anda. Silakan hubungi admin untuk informasi lebih lanjut.</p>
+                {/* Main Content Sections: Side by Side on Desktop */}
+                <div className="sections-grid">
+                    {/* Policies Section */}
+                    <div className="policies-section animate-slideUp">
+                        <div className="section-header">
+                            <h2>Polis Anda</h2>
                         </div>
-                    ) : (
-                        <div className="policies-grid">
-                            {policies.map((policy) => {
-                                const status = getStatusBadge(policy.status);
-                                return (
-                                    <div key={policy.id} className="policy-card">
-                                        <div className="policy-header">
-                                            <div className="policy-tier">
-                                                <div className="tier-icon">🛡️</div>
-                                                <div className="tier-info">
-                                                    <h3>{policy.tier_name || 'Standard'}</h3>
-                                                    <span className="policy-number">{policy.policy_number}</span>
+
+                        {policies.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="empty-icon">🛡️</div>
+                                <h3>Belum Ada Polis</h3>
+                                <p>Admin akan menambahkan polis untuk perangkat Anda.</p>
+                            </div>
+                        ) : (
+                            <div className="policies-list-stack">
+                                {policies.map((policy) => {
+                                    const status = getPolicyStatusBadge(policy.status);
+                                    return (
+                                        <div key={policy.id} className="policy-card compact">
+                                            <div className="policy-header">
+                                                <div className="policy-tier">
+                                                    <div className="tier-icon">🛡️</div>
+                                                    <div className="tier-info">
+                                                        <h3>{policy.tier_name || 'Standard'}</h3>
+                                                        <span className="policy-number">{policy.policy_number}</span>
+                                                    </div>
+                                                </div>
+                                                <span className={`badge ${status.class}`}>{status.label}</span>
+                                            </div>
+
+                                            <div className="policy-balance">
+                                                <span className="balance-label">Saldo Policy</span>
+                                                <span className="balance-value text-success font-bold">{formatCurrency(policy.policy_balance)}</span>
+                                            </div>
+
+                                            <div className="policy-footer">
+                                                <div className="store-info-badge">
+                                                    <span className="store-label">🏪 Terdaftar di:</span>
+                                                    <span className="store-value">{policy.store_name || 'Smile Center'}</span>
                                                 </div>
                                             </div>
-                                            <span className={`badge ${status.class}`}>{status.label}</span>
-                                        </div>
-
-                                        <div className="policy-balance">
-                                            <span className="balance-label">Saldo Policy</span>
-                                            <span className="balance-value">{formatCurrency(policy.policy_balance)}</span>
-                                        </div>
-
-                                        <div className="policy-device">
-                                            <div className="device-row">
-                                                <span className="device-label">Perangkat</span>
-                                                <span className="device-value">{policy.device_brand} {policy.device_model}</span>
+                                            <div className="policy-device">
+                                                <div className="device-row mb-1">
+                                                    <span className="device-label">Perangkat:</span>
+                                                    <span className="device-value font-medium">{policy.device_brand} {policy.device_model}</span>
+                                                </div>
                                             </div>
-                                            <div className="device-row">
-                                                <span className="device-label">IMEI</span>
-                                                <span className="device-value">{policy.imei_number}</span>
+
+                                            <div className="policy-actions mt-4">
+                                                {policy.status === 'active' ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedPolicy(policy);
+                                                            setShowClaimForm(true);
+                                                        }}
+                                                        className="btn btn-primary btn-block"
+                                                    >
+                                                        <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                            <path d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z" />
+                                                            <circle cx="12" cy="13" r="3" />
+                                                        </svg>
+                                                        Ajukan Klaim
+                                                    </button>
+                                                ) : (
+                                                    <button className="btn btn-secondary btn-block" disabled>
+                                                        {policy.status === 'expired' ? 'Polis Kadaluarsa' : 'Polis Tidak Aktif'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
 
-                                        <div className="policy-actions">
-                                            {policy.status === 'active' ? (
-                                                <Link
-                                                    to={`/claims?policy=${policy.id}`}
-                                                    className="btn btn-primary"
-                                                >
-                                                    <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <path d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z" />
-                                                        <circle cx="12" cy="13" r="3" />
-                                                    </svg>
-                                                    Ajukan Klaim
-                                                </Link>
-                                            ) : (
-                                                <button className="btn btn-secondary" disabled>
-                                                    <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <circle cx="12" cy="12" r="10" />
-                                                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                                                    </svg>
-                                                    {policy.status === 'expired' ? 'Polis Kadaluarsa' : 'Polis Tidak Aktif'}
-                                                </button>
+                    {/* Claims History Section */}
+                    <div className="claims-history-section animate-slideUp delay-100">
+                        <div className="section-header">
+                            <h2>Riwayat Klaim</h2>
+                        </div>
+
+                        {claims.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="empty-icon">📋</div>
+                                <h3>Belum Ada Klaim</h3>
+                                <p>Riwayat klaim Anda akan muncul di sini.</p>
+                            </div>
+                        ) : (
+                            <div className="claims-list-stack">
+                                {claims.map((claim) => {
+                                    const status = getClaimStatusBadge(claim.status);
+                                    return (
+                                        <div key={claim.id} className="dashboard-claim-card">
+                                            <div className="claim-header">
+                                                <div className="claim-status">
+                                                    <span className="status-icon">{status.icon}</span>
+                                                    <span className={`badge ${status.class}`}>{status.label}</span>
+                                                </div>
+                                                <span className="claim-date">{formatDate(claim.created_at)}</span>
+                                            </div>
+                                            <div className="claim-device">
+                                                <strong>{claim.device_brand} {claim.device_model}</strong>
+                                                <p className="claim-type">{claim.damage_type}</p>
+                                            </div>
+                                            {claim.claim_amount > 0 && (
+                                                <div className="claim-amount">
+                                                    <span className="amount-label">Jumlah : </span>
+                                                    <span className="amount-value text-primary">{formatCurrency(claim.claim_amount)}</span>
+                                                </div>
+                                            )}
+                                            {claim.admin_notes && (
+                                                <div className="claim-notes">
+                                                    <span className="notes-label">Note Admin:</span>
+                                                    <p>{claim.admin_notes}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Claim Form Modal - Reuse from ClaimsPage */}
+                {showClaimForm && (
+                    <div className="modal-overlay" onClick={() => resetClaimForm()}>
+                        <div className="claim-form-modal animate-slideUp" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2>Ajukan Klaim Baru</h2>
+                                <button className="close-btn" onClick={() => resetClaimForm()}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmitClaim} className="claim-form">
+                                <div className="form-group">
+                                    <label className="form-label">Polis</label>
+                                    <div className="policy-info-card">
+                                        <div className="policy-info-header">
+                                            <span className="policy-icon">🛡️</span>
+                                            <div className="policy-info-details">
+                                                <h4>{selectedPolicy.device_brand} {selectedPolicy.device_model}</h4>
+                                                <span className="policy-number">{selectedPolicy.policy_number}</span>
+                                            </div>
+                                        </div>
+                                        <div className="policy-balance-row">
+                                            <span>Saldo Policy:</span>
+                                            <strong>{formatCurrency(selectedPolicy.policy_balance)}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Deskripsi Kerusakan</label>
+                                    <textarea
+                                        className="form-textarea"
+                                        rows="3"
+                                        placeholder="Jelaskan detail kerusakan..."
+                                        value={claimForm.damage_description}
+                                        onChange={(e) => setClaimForm({ ...claimForm, damage_description: e.target.value })}
+                                        disabled={isSubmitting}
+                                        maxLength={500}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Tanggal Kejadian</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={claimForm.incident_date}
+                                        onChange={(e) => setClaimForm({ ...claimForm, incident_date: e.target.value })}
+                                        max={new Date().toISOString().split('T')[0]}
+                                        disabled={isSubmitting}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Foto Kerusakan (Maks. 5)</label>
+                                    <div className="photo-upload-area">
+                                        <div className="photo-grid">
+                                            {claimForm.photos.map((photo, index) => (
+                                                <div key={index} className="photo-preview">
+                                                    <img src={URL.createObjectURL(photo)} alt="Preview" />
+                                                    <button type="button" className="remove-photo" onClick={() => removePhoto(index)}>×</button>
+                                                </div>
+                                            ))}
+                                            {claimForm.photos.length < 5 && (
+                                                <label className="add-photo-btn">
+                                                    <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={isSubmitting} hidden />
+                                                    <span className="add-icon">+</span>
+                                                </label>
                                             )}
                                         </div>
                                     </div>
-                                );
-                            })}
+                                </div>
+
+                                <div className="modal-actions">
+                                    <button type="button" className="btn btn-secondary" onClick={() => resetClaimForm()}>Batal</button>
+                                    <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                                        {isSubmitting ? 'Mengirim...' : 'Ajukan Klaim'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 {/* Quick Info - Download App Only */}
                 <div className="quick-info animate-slideUp">

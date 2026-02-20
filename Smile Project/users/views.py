@@ -41,10 +41,11 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get', 'patch'], permission_classes=[IsAuthenticated])
     def me(self, request):
         user = request.user
-        
+            
         if request.method == 'GET':
             # 'request.user' adalah user yang sedang login
             serializer = self.get_serializer(user)
+            print(f"DEBUG PROFILE: User={user.email}, SerializedRole={serializer.data.get('role')}")
             return Response(serializer.data)
         
         elif request.method == 'PATCH':

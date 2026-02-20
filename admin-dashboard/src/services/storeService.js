@@ -31,21 +31,23 @@ export const storeService = {
 
     // Delete (deactivate) or destroy (permanent) store
     // Delete (deactivate) or destroy (permanent) store
-    async deleteStore(id, permanent = false) {
-        const params = permanent ? { permanent: 'true' } : {};
+    async deleteStore(id, permanent = false, password = '') {
+        const params = { password };
+        if (permanent) params.permanent = 'true';
+
         const response = await axios.delete(`/admin/stores/${id}/`, { params });
         return response.data;
     },
 
     // Reset store data (clear customers, policies, claims)
-    async resetStoreData(id) {
-        const response = await axios.post(`/admin/stores/${id}/reset-data/`);
+    async resetStoreData(id, password = '') {
+        const response = await axios.post(`/admin/stores/${id}/reset-data/`, { password });
         return response.data;
     },
 
     // Get store statistics
-    async getStoreStats(id) {
-        const response = await axios.get(`/admin/stores/${id}/stats/`);
+    async getStoreStats(id, params = {}) {
+        const response = await axios.get(`/admin/stores/${id}/stats/`, { params });
         return response.data;
     },
 

@@ -11,13 +11,39 @@ import 'screens/wallet/wallet_history_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/admin/admin_stores_screen.dart';
+import 'screens/admin/admin_users_screen.dart';
+import 'screens/admin/admin_policies_screen.dart';
+import 'screens/admin/admin_claims_screen.dart';
+import 'screens/admin/admin_store_detail_screen.dart';
+import 'screens/admin/admin_devices_screen.dart';
+import 'screens/admin/admin_tiers_screen.dart';
+import 'screens/admin/admin_analytics_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('auth_token');
+  final role = prefs.getString('user_role') ?? 'customer';
+  
+  // Jika ada token, langsung ke dashboard sesuai role. Jika tidak, ke login.
+  String initialRoute = '/';
+  if (token != null && token.isNotEmpty) {
+    bool isAdmin = (role == 'super_admin' || role == 'store_admin');
+    initialRoute = isAdmin ? '/admin-dashboard' : '/dashboard';
+  }
+  
+  runApp(MyApp(initialRoute: initialRoute));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String initialRoute;
+  
+  const MyApp({super.key, required this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +51,7 @@ class MyApp extends StatelessWidget {
       title: 'Smile by SPC',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      initialRoute: '/',
+      initialRoute: initialRoute,
       routes: {
         '/': (context) => const LoginScreen(), 
         '/register': (context) => const RegisterScreen(), 
@@ -38,6 +64,18 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfileScreen(),
         '/notifications': (context) => const NotificationsScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardScreen(),
+        '/admin-stores': (context) => const AdminStoresScreen(),
+        '/admin-users': (context) => const AdminUsersScreen(),
+        '/admin-policies': (context) => const AdminPoliciesScreen(),
+        '/admin-claims': (context) => const AdminClaimsScreen(),
+        '/admin-devices': (context) => const AdminDevicesScreen(),
+        '/admin-tiers': (context) => const AdminTiersScreen(),
+        '/admin-analytics': (context) => const AdminAnalyticsScreen(),
+        '/admin-store-detail': (context) {
+          final store = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return AdminStoreDetailScreen(store: store);
+        },
       },
     );
   }

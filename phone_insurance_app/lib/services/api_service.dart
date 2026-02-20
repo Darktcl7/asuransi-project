@@ -19,10 +19,10 @@ class ApiService {
   // static const String baseUrl = 'http://10.0.2.2:8000/api';
   
   // For Local Physical Device (use your computer's IP address):
-  // static const String baseUrl = 'http://192.168.100.4:8000/api';
+  static const String baseUrl = 'http://192.168.1.4:8000/api';
   
   // ✅ PRODUCTION SERVER:
-  static const String baseUrl = 'http://148.230.97.130/api';
+  // static const String baseUrl = 'http://148.230.97.130/api';
   
   // ================================================================
   String? _token;
@@ -135,6 +135,14 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await setToken(data['token']);
+        
+        // Save user role and data for routing
+        final prefs = await SharedPreferences.getInstance();
+        if (data['user'] != null) {
+          await prefs.setString('user_role', data['user']['role'] ?? 'customer');
+          await prefs.setString('user_data', jsonEncode(data['user']));
+        }
+        
         log('Login successful! Method: ${data['login_method']}');
         return data;
       } else {
@@ -507,5 +515,257 @@ class ApiService {
       }
       rethrow;
     }
+  }
+
+  // ================================================================
+  // ADMIN API - Super Admin Only
+  // ================================================================
+  
+  // Helper: GET Request with detailed logging
+  Future<dynamic> _get(String endpoint) async {
+    final url = Uri.parse('$baseUrl$endpoint');
+    log('API GET Request: $url');
+    log('API Headers: $_headers');
+    
+    try {
+      final response = await http.get(url, headers: _headers).timeout(const Duration(seconds: 15));
+      log('API Response ${response.statusCode} for $endpoint');
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        log('API Setup Error Body: ${response.body}');
+        throw Exception('API Error ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      log('API Connection Error: $e');
+      rethrow;
+    }
+  }
+
+  // Get Admin Dashboard Stats
+  Future<Map<String, dynamic>> getAdminStats() async {
+    return await _get('/admin/dashboard/') as Map<String, dynamic>;
+  }
+
+  // Get All Stores (Super Admin only)
+  Future<List<dynamic>> getAdminStores({String? search, bool? isActive}) async {
+    String endpoint = '/admin/stores/';
+    List<String> params = [];
+    if (search != null && search.isNotEmpty) params.add('search=$search');
+    if (isActive != null) params.add('is_active=$isActive');
+    
+    if (params.isNotEmpty) {
+      endpoint += '?' + params.join('&');
+    }
+
+    final res = await _get(endpoint);
+    // Handle pagination result
+    if (res is Map && res.containsKey('results')) {
+      return res['results'];
+    }
+    return res as List<dynamic>;
+  }
+
+  // Create Store
+  Future<Map<String, dynamic>> createAdminStore(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/stores/'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? error['error'] ?? 'Gagal membuat toko');
+    }
+  }
+
+  // Update Store
+  Future<Map<String, dynamic>> updateAdminStore(dynamic id, Map<String, dynamic> data) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/stores/$id/'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? error['error'] ?? 'Gagal update toko');
+    }
+  }
+
+  // Delete Store
+  Future<void> deleteAdminStore(dynamic id, {required String password, bool permanent = false}) async {
+    String url = '$baseUrl/admin/stores/$id/';
+    if (permanent) url += '?permanent=true';
+    
+    final response = await http.delete(
+      Uri.parse(url),
+      headers: _headers,
+      body: jsonEncode({'password': password}),
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? error['error'] ?? 'Gagal menghapus toko');
+    }
+  }
+
+  // Reset Store Data
+  Future<Map<String, dynamic>> resetStoreData(dynamic id, {required String password}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/stores/$id/reset-data/'),
+      headers: _headers,
+      body: jsonEncode({'password': password}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? error['error'] ?? 'Gagal reset data toko');
+    }
+  }
+
+  // Get Store Stats
+  // Get Store Stats
+  Future<Map<String, dynamic>> getStoreStats(dynamic id, {DateTime? startDate, DateTime? endDate}) async {
+    String endpoint = '/admin/stores/$id/stats/';
+    List<String> params = [];
+    
+    if (startDate != null) {
+      params.add('start_date=${startDate.toIso8601String().substring(0, 10)}');
+    }
+    if (endDate != null) {
+      params.add('end_date=${endDate.toIso8601String().substring(0, 10)}');
+    }
+    
+    if (params.isNotEmpty) {
+      endpoint += '?' + params.join('&');
+    }
+    
+    return await _get(endpoint) as Map<String, dynamic>;
+  }
+
+  // Get Admin Users
+  Future<List<dynamic>> getAdminUsers({String? search}) async {
+    String url = '$baseUrl/admin/users/';
+    if (search != null && search.isNotEmpty) url += '?search=$search';
+
+    final response = await http.get(Uri.parse(url), headers: _headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is Map ? data['results'] : data;
+    }
+    throw Exception('Gagal mengambil daftar user');
+  }
+
+  // Get Admin Policies
+  Future<List<dynamic>> getAdminPolicies({String? search}) async {
+    String url = '$baseUrl/admin/policies/';
+    if (search != null && search.isNotEmpty) url += '?search=$search';
+
+    final response = await http.get(Uri.parse(url), headers: _headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is Map ? data['results'] : data;
+    }
+    throw Exception('Gagal mengambil daftar polis');
+  }
+
+  // Get Admin Claims
+  Future<List<dynamic>> getAdminClaims({String? search}) async {
+    String url = '$baseUrl/admin/claims/';
+    if (search != null && search.isNotEmpty) url += '?search=$search';
+
+    final response = await http.get(Uri.parse(url), headers: _headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is Map ? data['results'] : data;
+    }
+    throw Exception('Gagal mengambil daftar klaim');
+  }
+
+  // Get Activity Logs
+  // Get Activity Logs
+  Future<List<dynamic>> getAdminActivityLogs() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/activity-logs/'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is Map ? data['results'] : data;
+    }
+    throw Exception('Gagal mengambil log aktivitas');
+  }
+
+  // Get Admin Devices
+  Future<List<dynamic>> getAdminDevices({String? search}) async {
+    String url = '$baseUrl/admin/devices/';
+    if (search != null && search.isNotEmpty) url += '?search=$search';
+
+    final response = await http.get(Uri.parse(url), headers: _headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is Map ? data['results'] : data;
+    }
+    throw Exception('Gagal mengambil daftar perangkat');
+  }
+
+  // Get Admin Tiers
+  Future<List<dynamic>> getAdminTiers() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/policy-tiers/'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is Map ? data['results'] : data;
+    }
+    throw Exception('Gagal mengambil daftar tier');
+  }
+
+  // Create Admin Device
+  Future<void> createAdminDevice(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/devices/'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    if (response.statusCode != 201) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? error['error'] ?? 'Gagal membuat perangkat');
+    }
+  }
+
+  // Create Admin Tier
+  Future<void> createAdminTier(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/policy-tiers/'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    if (response.statusCode != 201) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? error['error'] ?? 'Gagal membuat tier');
+    }
+  }
+
+  // Get Admin Reports / Analytics
+  Future<List<dynamic>> getAdminReports({DateTime? startDate, DateTime? endDate}) async {
+    String url = '$baseUrl/admin/reports/';
+    List<String> params = [];
+    if (startDate != null) params.add('start_date=${startDate.toIso8601String().substring(0, 10)}');
+    if (endDate != null) params.add('end_date=${endDate.toIso8601String().substring(0, 10)}');
+    if (params.isNotEmpty) url += '?${params.join('&')}';
+
+    final response = await http.get(Uri.parse(url), headers: _headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data is List ? data : (data['results'] ?? []);
+    }
+    throw Exception('Gagal mengambil data laporan');
   }
 }

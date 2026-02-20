@@ -94,7 +94,11 @@ class _ClaimHistoryScreenState extends State<ClaimHistoryScreen> {
 
   String _formatCurrency(double value) {
     try {
-      return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+      String formatted = value.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]}.'
+      );
+      return 'Rp $formatted';
     } catch (e) {
       return 'Rp 0';
     }

@@ -23,18 +23,22 @@ class PolicySerializer(serializers.ModelSerializer):
     # Tampilkan detail, bukan cuma ID
     tier_details = PolicyTierSerializer(source='tier', read_only=True)
     device_details = DevicePackageSerializer(source='device_package', read_only=True)
-    user_name = serializers.CharField(source='user.first_name', read_only=True)
+    user_name = serializers.SerializerMethodField()
     
-    # Add flat fields for Flutter
-    tier_name = serializers.CharField(source='tier.tier_name', read_only=True)
-    claims_limit = serializers.IntegerField(source='tier.max_claims_per_year', read_only=True)
-    max_claims_per_year = serializers.IntegerField(source='tier.max_claims_per_year', read_only=True)
+    # Flat fields for Frontend (Defensive)
+    tier_name = serializers.SerializerMethodField()
+    device_brand = serializers.SerializerMethodField()
+    device_model = serializers.SerializerMethodField()
+    store_name = serializers.SerializerMethodField()
+    claims_limit = serializers.SerializerMethodField()
+    max_claims_per_year = serializers.SerializerMethodField()
 
     class Meta:
         model = Policy
         fields = [
             'id', 'policy_number', 'user', 'user_name', 'tier', 
-            'tier_details', 'tier_name', 'claims_limit', 'max_claims_per_year',
+            'tier_details', 'tier_name', 'device_brand', 'device_model', 'store_name', 
+            'claims_limit', 'max_claims_per_year',
             'device_package', 'device_details', 
             'imei_number', 'purchase_price', 'policy_price', 'policy_balance',
             'activation_date', 'expiry_date', 'claims_used', 'status'
@@ -44,3 +48,46 @@ class PolicySerializer(serializers.ModelSerializer):
             'policy_number', 'user', 'tier', 'policy_price', 'policy_balance',
             'activation_date', 'expiry_date', 'claims_used', 'status'
         ]
+
+    def get_user_name(self, obj):
+        try:
+            if not obj.user: return None
+            return f"{obj.user.first_name} {obj.user.last_name}".strip() or obj.user.email
+        except:
+            return None
+
+    def get_tier_name(self, obj):
+        try:
+            return obj.tier.tier_name if obj.tier else None
+        except:
+            return None
+
+    def get_device_brand(self, obj):
+        try:
+            return obj.device_package.device_brand if obj.device_package else None
+        except:
+            return None
+
+    def get_device_model(self, obj):
+        try:
+            return obj.device_package.device_model if obj.device_package else None
+        except:
+            return None
+
+    def get_store_name(self, obj):
+        try:
+            return obj.store.name if obj.store else None
+        except:
+            return None
+
+    def get_claims_limit(self, obj):
+        try:
+            return obj.tier.max_claims_per_year if obj.tier else 0
+        except:
+            return 0
+        
+    def get_max_claims_per_year(self, obj):
+        try:
+            return obj.tier.max_claims_per_year if obj.tier else 0
+        except:
+            return 0

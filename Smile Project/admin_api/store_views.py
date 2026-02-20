@@ -144,6 +144,14 @@ class StoreViewSet(viewsets.ModelViewSet):
         if count == 0:
             return Response({'message': 'Toko sudah kosong, tidak ada data customer.'})
             
+        # Verify Password
+        password = request.data.get('password')
+        if not password:
+            return Response({'error': 'Password diperlukan untuk melakukan reset data.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not request.user.check_password(password):
+            return Response({'error': 'Password yang Anda masukkan salah.'}, status=status.HTTP_400_BAD_REQUEST)
+            
         # Log activity
         ActivityLog.log(
             request=request,
@@ -161,8 +169,16 @@ class StoreViewSet(viewsets.ModelViewSet):
         })
 
     def destroy(self, request, pk=None):
-        """Soft delete (default) or Permanent delete"""
+        """Soft delete (default) or Permanent delete with password verification"""
         store = self.get_object()
+        
+        # Verify Password for any delete action
+        password = request.data.get('password') or request.query_params.get('password')
+        if not password:
+            return Response({'error': 'Password diperlukan untuk menonaktifkan atau menghapus toko.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not request.user.check_password(password):
+            return Response({'error': 'Password yang Anda masukkan salah.'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if permanent delete requested
         is_permanent = request.query_params.get('permanent') == 'true'
@@ -215,44 +231,131 @@ class StoreViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):
         """
-        Get detailed statistics for a store
-        GET /api/admin/stores/{id}/stats/
+        Get detailed statistics for a store with custom date range and grouping
+        GET /api/admin/stores/{id}/stats/?start_date=2025-01-01&end_date=2025-12-31&period=month
         """
+        from django.utils import timezone
+        from datetime import datetime, timedelta
+        from django.db.models import Sum, Avg
+        from django.db.models.functions import TruncDate, TruncMonth, TruncYear, TruncWeek
+        
         store = self.get_object()
         
-        # User stats
+        # Parse query params
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        period = request.query_params.get('period', 'day') # day, week, month, year
+        
+        print(f"DEBUG STORE STATS: Store={store.name}, Start={start_date_str}, End={end_date_str}")
+        
+        # Default range: TODAY (Daily Recap) if not provided
+        today = timezone.now().date()
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                start_date = today
+        else:
+            start_date = today # Default to today
+            
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                end_date = today
+        else:
+            end_date = today
+
+        # Base filter for periods
+        date_filter = Q(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        
+        # User stats (Global & Filtered)
         users = User.objects.filter(store=store)
+        new_customers = users.filter(role='customer', date_joined__date__gte=start_date, date_joined__date__lte=end_date).count()
+        
         user_stats = {
-            'total_customers': users.filter(role='customer').count(),
+            'total_customers': users.filter(role='customer').count(), # Global
+            'new_customers': new_customers, # Filtered
             'total_staff': users.filter(role='store_staff').count(),
             'total_admins': users.filter(role='store_admin').count(),
-            'verified_customers': users.filter(role='customer', is_verified=True).count(),
         }
         
-        # Policy stats
-        policies = Policy.objects.filter(user__store=store)
+        # Policy stats (Filtered by store)
+        policies = Policy.objects.filter(Q(store=store) | Q(user__store=store)).distinct()
+        
+        # Filtered policies for recap (Daily/Range)
+        filtered_policies = policies.filter(date_filter)
+        
         policy_stats = {
-            'total': policies.count(),
+            'total': policies.count(), # Global
+            'filtered_count': filtered_policies.count(), # Range
+            'filtered_revenue': float(filtered_policies.aggregate(total=Sum('policy_price'))['total'] or 0), # Range
             'active': policies.filter(status='active').count(),
             'pending': policies.filter(status='pending').count(),
             'expired': policies.filter(status='expired').count(),
         }
+
+        # Grouping logic for Chart (Recap)
+        trunc_func = TruncDate
+        if period == 'month':
+            trunc_func = TruncMonth
+        elif period == 'year':
+            trunc_func = TruncYear
+        elif period == 'week':
+            trunc_func = TruncWeek
+            
+        # Advanced recap based on period
+        recap = filtered_policies.annotate(
+            bucket=trunc_func('created_at')
+        ).values('bucket').annotate(
+            count=Count('id'),
+            revenue=Sum('policy_price')
+        ).order_by('bucket')
         
-        # Claim stats
-        claims = Claim.objects.filter(user__store=store)
+        # Phone type distribution (Top 5 models in this range)
+        phone_distribution = filtered_policies.values(
+            'device_package__device_brand', 
+            'device_package__device_model'
+        ).annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+        
+        # Claim stats (Filtered by range)
+        claims = Claim.objects.filter(policy__store=store)
+        filtered_claims = claims.filter(date_filter)
+        
         claim_stats = {
-            'total': claims.count(),
-            'pending': claims.filter(status='pending').count(),
-            'approved': claims.filter(status='approved').count(),
-            'rejected': claims.filter(status='rejected').count(),
-            'completed': claims.filter(status='completed').count(),
+            'total': claims.count(), # Global
+            'filtered_total': filtered_claims.count(), # Range
+            'filtered_pending': filtered_claims.filter(status='pending').count(), # Range
+            'filtered_approved': filtered_claims.filter(status='approved').count(), # Range
+            'filtered_in_progress': filtered_claims.filter(status='in_progress').count(), # Range
+            'filtered_completed': filtered_claims.filter(status='completed').count(), # Range
+            'filtered_rejected': filtered_claims.filter(status='rejected').count(), # Range
+        }
+        
+        # Summary for the selected range (Dashboard Cards)
+        summary = {
+            'total_policies': policy_stats['filtered_count'],
+            'total_revenue': policy_stats['filtered_revenue'],
+            'new_customers': new_customers,
+            'new_claims': claim_stats['filtered_total'],
+            'claim_pending': claim_stats['filtered_pending']
         }
         
         return Response({
             'store': StoreSerializer(store).data,
+            'summary': summary,
+            'recap': list(recap),
             'users': user_stats,
             'policies': policy_stats,
+            'phone_distribution': list(phone_distribution),
             'claims': claim_stats,
+            'filters': {
+                'start_date': start_date,
+                'end_date': end_date,
+                'period': period
+            }
         })
     
     @action(detail=True, methods=['get'])

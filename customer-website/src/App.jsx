@@ -11,7 +11,6 @@ import DownloadPage from './pages/DownloadPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-import ClaimsPage from './pages/ClaimsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ProfilePage from './pages/ProfilePage';
 
@@ -99,26 +98,6 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <DashboardPage />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/claims"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ClaimsPage />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/claims/new"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ClaimsPage />
                   </Layout>
                 </ProtectedRoute>
               }

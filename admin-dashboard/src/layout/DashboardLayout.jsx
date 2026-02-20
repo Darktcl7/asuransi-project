@@ -42,6 +42,8 @@ const DashboardLayout = () => {
     { path: '/devices', icon: '📱', label: 'Devices' },
     { path: '/activity-logs', icon: '📜', label: 'Activity Logs' },
     { path: '/reports', icon: '📈', label: 'Analytics' },
+    { path: '/claims', icon: '🎫', label: 'Claims' }, // Added for Super Admin
+    { path: '/policies', icon: '📋', label: 'Policies' }, // Added for Super Admin
     { path: '/users', icon: '👥', label: 'Users' }, // Super Admin can still manage all users
     // Future: Policy Tiers management
     { path: '/policy-tiers', icon: '⭐', label: 'Policy Tiers' },

@@ -17,6 +17,7 @@ class Policy {
   final int claimsUsed;
   final String status;
   final String? tierName;
+  final String? storeName; // ✅ Store association
   final int maxClaimsPerYear; // Updated to match backend
   
   Policy({
@@ -34,6 +35,7 @@ class Policy {
     required this.claimsUsed,
     required this.status,
     this.tierName,
+    this.storeName,
     required this.maxClaimsPerYear,
   });
   
@@ -52,7 +54,8 @@ class Policy {
       expiryDate: DateTime.parse(json['expiry_date']),
       claimsUsed: json['claims_used'],
       status: json['status'],
-      tierName: json['tier_name'],
+      tierName: json['tier_name'] ?? json['tier_details']?['tier_name'],
+      storeName: json['store_name'] ?? json['store_details']?['name'] ?? json['store']?['name'],
       maxClaimsPerYear: json['max_claims_per_year'] ?? json['claims_limit'] ?? 5,
     );
   }

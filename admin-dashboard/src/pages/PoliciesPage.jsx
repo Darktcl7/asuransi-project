@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminService } from '../services/adminService';
+import { authService } from '../services/authService';
 import { usePagination, useDebounce } from '../utils/hooks';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { useToast } from '../components/Toast';
@@ -13,6 +14,7 @@ const PoliciesPage = () => {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [isExporting, setIsExporting] = useState(false);
+  const isSuperAdmin = authService.isSuperAdmin();
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['policies', page, status, debouncedSearch],
@@ -127,6 +129,7 @@ const PoliciesPage = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Policy #</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Store</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expiry</th>
@@ -143,20 +146,27 @@ const PoliciesPage = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${policy.tier === 'Premium' ? 'bg-purple-100 text-purple-800' :
-                            policy.tier === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
+                          policy.tier === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
                           }`}>
                           {policy.tier}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {policy.store_name ? (
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-orange-600">🏪 {policy.store_name}</span>
+                          </div>
+                        ) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {policy.device}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${policy.status === 'active' ? 'bg-green-100 text-green-800' :
-                            policy.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              policy.status === 'expired' ? 'bg-gray-100 text-gray-800' :
-                                'bg-red-100 text-red-800'
+                          policy.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            policy.status === 'expired' ? 'bg-gray-100 text-gray-800' :
+                              'bg-red-100 text-red-800'
                           }`}>
                           {policy.status}
                         </span>

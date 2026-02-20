@@ -13,7 +13,13 @@ const UsersPage = () => {
   const toast = useToast();
   const { page, setPage, nextPage, prevPage, resetPage } = usePagination(1);
   const [search, setSearch] = useState('');
-  const [isVerified, setIsVerified] = useState('');
+
+  // Auto-sync user profile to ensure latest role is applied
+  useEffect(() => {
+    authService.syncUser();
+  }, []);
+
+  const [isActive, setIsActive] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -29,7 +35,6 @@ const UsersPage = () => {
     phone_number: '',
     ktp_number: '',
     address: '',
-    is_verified: false,
     is_active: true,
     role: 'customer',
     store: '',
@@ -47,11 +52,11 @@ const UsersPage = () => {
 
   // Use debounced search untuk query
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['users', page, debouncedSearch, isVerified],
+    queryKey: ['users', page, debouncedSearch, isActive],
     queryFn: () => adminService.getUsers({
       page,
       search: debouncedSearch,
-      is_verified: isVerified,
+      is_active: isActive,
     }),
     keepPreviousData: true,
     staleTime: 30000, // Data fresh for 30 seconds
@@ -66,8 +71,8 @@ const UsersPage = () => {
     }
   };
 
-  const handleVerifiedChange = (value) => {
-    setIsVerified(value);
+  const handleActiveChange = (value) => {
+    setIsActive(value);
     resetPage();
   };
 
@@ -105,7 +110,6 @@ const UsersPage = () => {
         phone_number: userDetail.phone_number || '',
         ktp_number: userDetail.ktp_number || '',
         address: userDetail.address || '',
-        is_verified: userDetail.is_verified || false,
         is_active: userDetail.is_active !== undefined ? userDetail.is_active : true,
         role: userDetail.role || 'customer',
         store: userDetail.store?.id || '',
@@ -125,7 +129,25 @@ const UsersPage = () => {
     },
     onError: (error) => {
       console.error('Update failed:', error);
-      toast.error(error.response?.data?.error || 'Failed to update user');
+      const errorData = error.response?.data;
+      let message = 'Failed to update user';
+
+      if (errorData) {
+        if (typeof errorData === 'string') message = errorData;
+        else if (errorData.error) message = errorData.error;
+        else if (errorData.detail) message = errorData.detail;
+        else {
+          // Flatten nested validation errors from DRF
+          const errors = [];
+          for (const key in errorData) {
+            if (Array.isArray(errorData[key])) {
+              errors.push(`${key}: ${errorData[key].join(', ')}`);
+            }
+          }
+          if (errors.length > 0) message = errors.join(' | ');
+        }
+      }
+      toast.error(message);
     },
   });
 
@@ -195,14 +217,14 @@ const UsersPage = () => {
     <div className="space-y-6">
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative flex-1">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:w-96">
             <input
               type="text"
               placeholder="Search by email, phone, or name..."
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
             />
             {isFetching && (
               <div className="absolute right-3 top-3">
@@ -210,23 +232,27 @@ const UsersPage = () => {
               </div>
             )}
           </div>
-          <select
-            value={isVerified}
-            onChange={(e) => handleVerifiedChange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All Users</option>
-            <option value="true">Verified Only</option>
-            <option value="false">Unverified Only</option>
-          </select>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm text-gray-600">
-              Total: <span className="font-bold">{data?.count?.toLocaleString() || 0}</span> users
-            </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => queryClient.invalidateQueries(['users'])}
+              className="p-2 text-gray-400 hover:text-indigo-600 transition-colors border rounded-lg bg-white"
+              title="Refresh List"
+            >
+              🔄
+            </button>
+            <select
+              value={isActive}
+              onChange={(e) => handleActiveChange(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            >
+              <option value="">Semua Status</option>
+              <option value="true">Aktif</option>
+              <option value="false">Nonaktif</option>
+            </select>
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium border border-green-700 shadow-sm"
             >
               {isExporting ? (
                 <>
@@ -241,11 +267,14 @@ const UsersPage = () => {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Export to Excel
+                  Export Excel
                 </>
               )}
             </button>
           </div>
+        </div>
+        <div className="mt-2 text-sm text-gray-600">
+          Total: <span className="font-bold text-indigo-600">{data?.count?.toLocaleString() || 0}</span> users
         </div>
       </div>
 
@@ -291,7 +320,7 @@ const UsersPage = () => {
                               }`}>
                               {user.role || 'customer'}
                             </span>
-                            {user.store && (
+                            {user.store && user.role !== 'super_admin' && (
                               <div className="text-xs text-gray-500 mt-1">
                                 🏪 {user.store.code}
                               </div>
@@ -301,15 +330,6 @@ const UsersPage = () => {
                       )}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex gap-2">
-                          {user.is_verified ? (
-                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                              Verified
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                              Unverified
-                            </span>
-                          )}
                           {user.is_active ? (
                             <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                               Active
@@ -492,7 +512,15 @@ const UsersPage = () => {
                       </label>
                       <select
                         value={editForm.role}
-                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        onChange={(e) => {
+                          const newRole = e.target.value;
+                          setEditForm({
+                            ...editForm,
+                            role: newRole,
+                            // Clear store if role is super_admin or customer
+                            store: (newRole === 'super_admin' || newRole === 'customer') ? '' : editForm.store
+                          });
+                        }}
                         className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                       >
                         <option value="customer">Customer</option>
@@ -503,7 +531,7 @@ const UsersPage = () => {
                     </div>
 
                     {/* Store Assignment */}
-                    {editForm.role !== 'super_admin' && editForm.role !== 'customer' && (
+                    {editForm.role !== 'super_admin' && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Assign to Store
@@ -521,7 +549,7 @@ const UsersPage = () => {
                           ))}
                         </select>
                         <p className="text-xs text-gray-500 mt-1">
-                          Store Admin/Staff harus di-assign ke toko
+                          User akan muncul di dashboard Admin Store yang dipilih
                         </p>
                       </div>
                     )}
@@ -530,23 +558,14 @@ const UsersPage = () => {
 
                 {/* Checkboxes */}
                 <div className="flex gap-6">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={editForm.is_verified}
-                      onChange={(e) => setEditForm({ ...editForm, is_verified: e.target.checked })}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Verified</span>
-                  </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center cursor-pointer group">
                     <input
                       type="checkbox"
                       checked={editForm.is_active}
                       onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition-all"
                     />
-                    <span className="ml-2 text-sm text-gray-700">Active</span>
+                    <span className="ml-2 text-sm text-gray-700 group-hover:text-indigo-600 transition-colors">Akun Aktif (Dapat Login)</span>
                   </label>
                 </div>
               </div>

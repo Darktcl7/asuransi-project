@@ -21,6 +21,20 @@ export const authService = {
     return response.data;
   },
 
+  // Sync current user info from server
+  async syncUser() {
+    try {
+      const response = await axios.get('/api/users/me/');
+      if (response.data) {
+        localStorage.setItem('admin_user', JSON.stringify(response.data));
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Failed to sync user:', error);
+      return null;
+    }
+  },
+
   // Logout
   logout() {
     localStorage.removeItem('admin_token');

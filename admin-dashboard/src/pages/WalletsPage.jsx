@@ -28,7 +28,9 @@ const WalletsPage = () => {
   });
 
   const formatCurrency = (value) => {
-    return `Rp ${value.toLocaleString('id-ID')}`;
+    if (!value && value !== 0) return 'Rp 0';
+    const formatted = Math.floor(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return `Rp ${formatted}`;
   };
 
   return (
@@ -43,9 +45,9 @@ const WalletsPage = () => {
           </div>
           <div className="ml-3">
             <p className="text-sm text-yellow-700">
-              <strong className="font-medium">Sistem Wallet Sudah Tidak Dipakai!</strong> 
+              <strong className="font-medium">Sistem Wallet Sudah Tidak Dipakai!</strong>
               <span className="block mt-1">
-                Sekarang setiap policy punya saldo sendiri (policy balance) sesuai harga HP. 
+                Sekarang setiap policy punya saldo sendiri (policy balance) sesuai harga HP.
                 Wallet balance di halaman ini sudah tidak relevan dan akan dihapus di versi berikutnya.
               </span>
               <span className="block mt-2 font-medium">

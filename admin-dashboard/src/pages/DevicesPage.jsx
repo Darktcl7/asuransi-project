@@ -11,23 +11,10 @@ const DevicesPage = () => {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editDevice, setEditDevice] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Check if user is Super Admin
   const isSuperAdmin = authService.isSuperAdmin();
-
-  // Access denied for non-Super Admin
-  if (!isSuperAdmin) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
-          <p className="text-gray-600">Hanya Super Admin yang dapat mengakses halaman Devices.</p>
-          <p className="text-sm text-gray-500 mt-2">Devices adalah data global yang dikelola oleh Super Admin.</p>
-        </div>
-      </div>
-    );
-  }
 
   // Fetch devices
   const { data: devices, isLoading } = useQuery({
@@ -71,9 +58,14 @@ const DevicesPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this device?')) {
-      deleteMutation.mutate(id);
+  const handleDelete = (device) => {
+    setDeleteConfirm(device);
+  };
+
+  const executeDelete = () => {
+    if (deleteConfirm) {
+      deleteMutation.mutate(deleteConfirm.id);
+      setDeleteConfirm(null);
     }
   };
 
@@ -89,16 +81,18 @@ const DevicesPage = () => {
           <h2 className="text-2xl font-bold text-gray-800">Device Management</h2>
           <p className="text-gray-600">Manage handphone, elektronik, laptop, dll</p>
         </div>
-        <button
-          onClick={() => {
-            setEditDevice(null);
-            setShowModal(true);
-          }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Add Device
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => {
+              setEditDevice(null);
+              setShowModal(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Add Device
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -151,7 +145,7 @@ const DevicesPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  {isSuperAdmin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -183,22 +177,25 @@ const DevicesPage = () => {
                         {device.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(device)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(device.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {isSuperAdmin && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(device)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(device)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -219,6 +216,38 @@ const DevicesPage = () => {
           }}
           isLoading={saveMutation.isLoading}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+            <div className="p-8 text-center bg-red-50">
+              <div className="w-20 h-20 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-4 text-4xl">
+                ⚠️
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Device?</h3>
+              <p className="text-sm text-gray-600">
+                Apakah Anda yakin ingin menghapus <strong>{deleteConfirm.device_brand} {deleteConfirm.device_model}</strong>?
+                <br />Data yang sudah digunakan dalam polis tidak dapat dihapus.
+              </p>
+            </div>
+            <div className="p-6 flex flex-col gap-2">
+              <button
+                onClick={executeDelete}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2"
+              >
+                🗑️ Ya, Hapus Device
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition"
+              >
+                Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

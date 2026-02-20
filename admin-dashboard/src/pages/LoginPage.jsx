@@ -17,7 +17,7 @@ const LoginPage = () => {
 
     try {
       await authService.login(email, password);
-      navigate('/dashboard');
+      navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {

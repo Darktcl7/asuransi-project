@@ -88,7 +88,18 @@ class WalletTransaction {
   String get formattedAmount {
     try {
       final value = amount.abs();
-      return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+      String str = value.toStringAsFixed(0);
+      String result = "";
+      int count = 0;
+      for (int i = str.length - 1; i >= 0; i--) {
+        result = str[i] + result;
+        count++;
+        if (count == 3 && i > 0) {
+          result = "." + result;
+          count = 0;
+        }
+      }
+      return 'Rp $result';
     } catch (e) {
       return 'Rp 0';
     }
@@ -96,7 +107,18 @@ class WalletTransaction {
   
   String get formattedBalanceBefore {
     try {
-      return 'Rp ${balanceBefore.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+      String str = balanceBefore.toStringAsFixed(0);
+      String result = "";
+      int count = 0;
+      for (int i = str.length - 1; i >= 0; i--) {
+        result = str[i] + result;
+        count++;
+        if (count == 3 && i > 0) {
+          result = "." + result;
+          count = 0;
+        }
+      }
+      return 'Rp $result';
     } catch (e) {
       return 'Rp 0';
     }
@@ -104,7 +126,18 @@ class WalletTransaction {
   
   String get formattedBalanceAfter {
     try {
-      return 'Rp ${balanceAfter.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+      String str = balanceAfter.toStringAsFixed(0);
+      String result = "";
+      int count = 0;
+      for (int i = str.length - 1; i >= 0; i--) {
+        result = str[i] + result;
+        count++;
+        if (count == 3 && i > 0) {
+          result = "." + result;
+          count = 0;
+        }
+      }
+      return 'Rp $result';
     } catch (e) {
       return 'Rp 0';
     }

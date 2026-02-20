@@ -34,12 +34,14 @@ const queryClient = new QueryClient({
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  return authService.isAuthenticated() ? children : <Navigate to="/login" />;
+  return authService.isAuthenticated() ? children : <Navigate to="/login" replace />;
 };
 
-// Dynamic basename for local dev vs production
+// Basename - uses Vite's base URL (/ in dev, /admin_store/ in production)
 const getBasename = () => {
-  return import.meta.env.DEV ? '/' : '/admin_store';
+  const base = import.meta.env.BASE_URL || '/';
+  // Remove trailing slash for react-router basename
+  return base.endsWith('/') ? base.slice(0, -1) || '/' : base;
 };
 
 function App() {
@@ -79,7 +81,7 @@ function App() {
             </Route>
 
             {/* Default Redirect */}
-            <Route path="*" element={<Navigate to="/" />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </ToastProvider>

@@ -33,9 +33,16 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      // Jika sukses, navigasi ke Dashboard
+      // Jika sukses, navigasi berdasarkan role
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        final data = await _apiService.getUserProfile();
+        final role = data['role'] ?? 'customer';
+        
+        if (role == 'super_admin') {
+          Navigator.pushReplacementNamed(context, '/admin-dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -133,30 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Insurance Protection',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.indigo.shade600,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Masuk ke akun Anda',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
                 const SizedBox(height: 32),
                 
                 // Email or Phone Number Field

@@ -12,7 +12,8 @@ OPTIMIZED ADMIN API VIEWS
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from .permissions import IsStoreStaffOrAbove
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Count, Sum, Q, Prefetch
 from django.utils import timezone
@@ -52,7 +53,7 @@ class DashboardStatsViewSet(viewsets.ViewSet):
     Dashboard Statistics - CACHED
     GET /api/admin/dashboard/
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     
     def list(self, request):
         from django.db.models import Sum, Count, Q
@@ -87,13 +88,26 @@ class DashboardStatsViewSet(viewsets.ViewSet):
         total_claim_paid = claims_qs.filter(status__in=['approved', 'completed']).aggregate(total=Sum('claim_amount'))['total'] or 0
         loss_ratio = (total_claim_paid / total_premium * 100) if total_premium > 0 else 0
 
+        # DAILY STATS (For Mobile Dashboard)
+        today = timezone.now().date()
+        today_policies_qs = policies_qs.filter(created_at__date=today)
+        today_claims_qs = claims_qs.filter(created_at__date=today)
+        
+        today_premium = today_policies_qs.filter(status__in=['active', 'expired']).aggregate(total=Sum('policy_price'))['total'] or 0
+        today_policies_count = today_policies_qs.count()
+        today_claims_count = today_claims_qs.count() # All claims submitted today
+
         # 2. Build Stats Dictionary
         stats = {
             'overview': {
                 'total_premium': float(total_premium),
                 'total_claim_paid': float(total_claim_paid),
                 'loss_ratio': round(loss_ratio, 2),
-                'outstanding_claims': claims_qs.filter(status='pending').count()
+                'outstanding_claims': claims_qs.filter(status='pending').count(),
+                # Add Daily Stats
+                'today_premium': float(today_premium),
+                'today_policies': today_policies_count,
+                'today_claims': today_claims_count
             },
             'trends': [],
             'users': {
@@ -201,30 +215,24 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     GET /api/admin/users/?search=john&is_verified=true&page=1
     GET /api/admin/users/?store=<store_id>  (Super Admin only)
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     pagination_class = OptimizedPagination
     
     def get_queryset(self):
         queryset = User.objects.select_related('store').order_by('-date_joined')
         user = self.request.user
         
-        # Store-based filtering
+        # Base Filtering (Role-based isolation)
         if user.role == 'super_admin':
             # Super Admin: Can see all, optionally filter by store
             store_filter = self.request.query_params.get('store')
             if store_filter:
-                # Filter users yang terdaftar di store tersebut
                 queryset = queryset.filter(store_id=store_filter)
-        elif user.role in ['store_admin', 'store_staff']:
-            # Store Admin/Staff: Only users REGISTERED at their store
-            if user.store:
-                # Filter by user.store only (simpler, more reliable)
-                queryset = queryset.filter(store=user.store)
-            else:
-                # No store assigned - show nothing
-                return queryset.none()
+        elif user.role in ['store_admin', 'store_staff'] and user.store:
+            # ✅ FIX: Store Admin/Staff only sees users REGISTERED at their store
+            queryset = queryset.filter(store=user.store)
         else:
-            # Other roles shouldn't access this
+            # Other roles or staff without store assigned shouldn't see anything
             return queryset.none()
         
         # Search by email, phone, name, or KTP (with XSS protection)
@@ -256,23 +264,56 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         page = self.paginate_queryset(queryset)
         
-        # Serialize data (minimal fields for list)
-        data = [{
-            'id': str(user.id),
-            'email': user.email,
-            'full_name': f"{user.first_name} {user.last_name}",
-            'phone_number': user.phone_number,
-            'ktp_number': user.ktp_number,
-            'is_verified': user.is_verified,
-            'is_active': user.is_active,
-            'date_joined': user.date_joined,
-            'role': user.role,
-            'store': {
-                'id': str(user.store.id),
-                'code': user.store.code,
-                'name': user.store.name
-            } if user.store else None,
-        } for user in page]
+        data = []
+        for user in page:
+            # Safe access to reverse relations (try 'policies' then 'policy_set')
+            policies_rel = getattr(user, 'policies', getattr(user, 'policy_set', None))
+            claims_rel = getattr(user, 'claims', getattr(user, 'claim_set', None))
+            
+            display_policy = None
+            total_policies = 0
+            active_policies = 0
+            
+            if policies_rel:
+                # We need to fetch related fields to avoid N+1 inside loop if possible, 
+                # but since we didn't prefetch cleanly, we rely on lazy loading (acceptable for admin list < 50)
+                all_policies = policies_rel.all().order_by('-created_at')
+                total_policies = all_policies.count()
+                
+                # Find active policy (manually iterating a few items is faster than DB query if count is small)
+                # But safer to filter
+                active_policy_qs = all_policies.filter(status='active')
+                if active_policy_qs.exists():
+                    display_policy = active_policy_qs.first()
+                    active_policies = active_policy_qs.count()
+                elif total_policies > 0:
+                     display_policy = all_policies.first() # Show latest if none active
+            
+            total_claims = claims_rel.count() if claims_rel else 0
+
+            data.append({
+                'id': str(user.id),
+                'email': user.email,
+                'full_name': f"{user.first_name} {user.last_name}",
+                'phone_number': user.phone_number,
+                'ktp_number': user.ktp_number,
+                'is_verified': user.is_verified,
+                'is_active': user.is_active,
+                'date_joined': user.date_joined,
+                'role': user.role,
+                'store': {
+                    'id': str(user.store.id),
+                    'code': user.store.code,
+                    'name': user.store.name
+                } if user.store else None,
+                'stats': {
+                    'total_policies': total_policies,
+                    'total_claims': total_claims,
+                    'active_policies': active_policies
+                },
+                'device_info': f"{display_policy.device_package.device_brand} {display_policy.device_package.device_model}" if display_policy and display_policy.device_package else "-",
+                'tier_info': display_policy.tier.tier_name if display_policy and display_policy.tier else "-",
+            })
         
         return self.get_paginated_response(data)
     
@@ -282,7 +323,8 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         GET /api/admin/users/{id}/
         """
         try:
-            user = User.objects.select_related('store').get(pk=pk)
+            # ✅ FIX: Use get_queryset to enforce store isolation
+            user = self.get_queryset().get(pk=pk)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -324,7 +366,8 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         }
         """
         try:
-            user = User.objects.get(pk=pk)
+            # ✅ FIX: Use get_queryset to enforce store isolation
+            user = self.get_queryset().get(pk=pk)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -370,6 +413,18 @@ class AdminUserViewSet(viewsets.ModelViewSet):
                     old_role = user.role
                     user.role = new_role
                     
+                    # Sync Django flags based on role
+                    if new_role == 'super_admin':
+                        user.is_superuser = True
+                        user.is_staff = True
+                        user.store = None  # Force clear store for super_admin
+                    elif new_role in ['store_admin', 'store_staff']:
+                        user.is_superuser = False
+                        user.is_staff = True
+                    else:
+                        user.is_superuser = False
+                        user.is_staff = False
+                    
                     # Log role change
                     from stores.activity_log import ActivityLog
                     ActivityLog.log(
@@ -381,8 +436,8 @@ class AdminUserViewSet(viewsets.ModelViewSet):
                         extra_data={'old_role': old_role, 'new_role': new_role}
                     )
             
-            # Store assignment (only for store_staff and store_admin)
-            if new_store and new_role in ['store_staff', 'store_admin']:
+            # Store assignment (Allow for customers too, to fix registration errors)
+            if new_store:
                 from stores.models import Store
                 try:
                     store = Store.objects.get(id=new_store)
@@ -610,7 +665,7 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
     GET /api/admin/claims/?status=pending&search=CLM&page=1
     GET /api/admin/claims/notifications/ - Get pending claims for notification
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     pagination_class = OptimizedPagination
     
     def get_queryset(self):
@@ -654,7 +709,10 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             'claim_number': claim.claim_number,
             'user_email': claim.user.email,
             'user_name': f"{claim.user.first_name} {claim.user.last_name}",
+            'user_full_name': f"{claim.user.first_name} {claim.user.last_name}", # Alias for Flutter
             'device': f"{claim.policy.device_package.device_brand} {claim.policy.device_package.device_model}",
+            'device_full_name': f"{claim.policy.device_package.device_brand} {claim.policy.device_package.device_model}", # Alias for Flutter
+            'store_name': claim.policy.store.name if claim.policy.store else '-',
             'imei_number': claim.policy.imei_number or 'N/A',  # IMEI untuk verifikasi
             'damage_type': claim.damage_type,
             'damage_description': claim.damage_description,
@@ -667,6 +725,7 @@ class AdminClaimViewSet(viewsets.ModelViewSet):
             'payment_notes': claim.payment_notes or '',
             'payment_date': claim.payment_date,
             'created_at': claim.created_at,
+            'updated_at': claim.processed_date if claim.processed_date else claim.created_at, # Alias for Flutter
             # Include photos with full URL
             'photos': [{
                 'id': str(photo.id),
@@ -1123,7 +1182,7 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
     GET /api/admin/policies/?status=pending&page=1
     POST /api/admin/policies/manual-create/ - Create policy for user
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     pagination_class = OptimizedPagination
     
     def get_queryset(self):
@@ -1170,6 +1229,12 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
                 'model': policy.device_package.device_model,
             },
             'policy_balance': float(policy.policy_balance),
+            'user_full_name': f"{policy.user.first_name} {policy.user.last_name}",
+            'device_brand': policy.device_package.device_brand,
+            'device_model': policy.device_package.device_model,
+            'store_name': policy.store.name if policy.store else '-',
+            'imei_number': policy.imei_number,
+            'policy_price': float(policy.policy_price),
             'status': policy.status,
             'activation_date': policy.activation_date,
             'expiry_date': policy.expiry_date,
@@ -1300,9 +1365,14 @@ class AdminPolicyViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Get user
+        # Get user (Enforce store isolation)
         try:
-            user = User.objects.get(id=user_id)
+            if request.user.role == 'super_admin':
+                user = User.objects.get(id=user_id)
+            else:
+                if not request.user.store:
+                    return Response({'error': 'Admin belum ditugaskan ke toko manapun'}, status=status.HTTP_403_FORBIDDEN)
+                user = User.objects.get(id=user_id, store=request.user.store)
         except User.DoesNotExist:
             return Response(
                 {'error': 'User not found'},
@@ -1443,12 +1513,19 @@ class AdminWalletViewSet(viewsets.ViewSet):
     GET /api/admin/wallets/?page=1
     GET /api/admin/wallets/stats/ - Get total stats (all wallets)
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     pagination_class = OptimizedPagination
     
     def list(self, request):
-        # Get all wallets with user info
+        # Get wallets with user info
         queryset = Wallet.objects.select_related('user').order_by('-balance')
+        
+        # ✅ FIX: Store isolation
+        user = request.user
+        if user.role in ['store_admin', 'store_staff'] and user.store:
+            queryset = queryset.filter(user__store=user.store)
+        elif user.role != 'super_admin':
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
         
         # Search filter
         search = request.query_params.get('search', None)
@@ -1513,12 +1590,19 @@ class AdminTopUpViewSet(viewsets.ModelViewSet):
     GET /api/admin/topups/?status=pending&page=1
     POST /api/admin/topups/ - Create manual top-up
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     pagination_class = OptimizedPagination
     
     def get_queryset(self):
         queryset = TopUpTransaction.objects.select_related('user').order_by('-created_at')
         
+        # ✅ FIX: Store isolation
+        user = self.request.user
+        if user.role in ['store_admin', 'store_staff'] and user.store:
+            queryset = queryset.filter(user__store=user.store)
+        elif user.role != 'super_admin':
+            return queryset.none()
+
         # Filter by status
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
@@ -1581,10 +1665,15 @@ class AdminTopUpViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Get user
+        # Get user (Enforce store isolation)
         try:
             from users.models import User
-            user = User.objects.get(id=user_id)
+            if request.user.role == 'super_admin':
+                user = User.objects.get(id=user_id)
+            else:
+                if not request.user.store:
+                    return Response({'error': 'Admin belum ditugaskan ke toko manapun'}, status=status.HTTP_403_FORBIDDEN)
+                user = User.objects.get(id=user_id, store=request.user.store)
         except User.DoesNotExist:
             return Response(
                 {'error': 'User not found'},
@@ -1692,7 +1781,7 @@ class AdminPolicyTierViewSet(viewsets.ModelViewSet):
     GET/POST/PUT/DELETE /api/admin/policy-tiers/
     """
     queryset = PolicyTier.objects.all().order_by('min_price')
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStoreStaffOrAbove]
     
     # Import serializer local to avoid circular import
     from policies.serializers import PolicyTierSerializer
