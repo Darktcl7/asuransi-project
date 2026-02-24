@@ -5,8 +5,8 @@ import { authService } from '../services/authService';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('chluik277@gmail.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -60,7 +60,7 @@ const LoginPage = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
-              placeholder="admin@smile.com"
+              placeholder=""
               required
             />
           </div>
@@ -72,7 +72,7 @@ const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
-              placeholder="••••••••"
+              placeholder=""
               required
             />
           </div>

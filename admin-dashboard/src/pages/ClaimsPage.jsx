@@ -427,9 +427,12 @@ const ClaimsPage = () => {
                       Biaya Perbaikan (Rp) *
                     </label>
                     <input
-                      type="number"
-                      value={claimAmount}
-                      onChange={(e) => setClaimAmount(e.target.value)}
+                      type="text"
+                      value={claimAmount ? Number(claimAmount).toLocaleString('id-ID') : ''}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+                        setClaimAmount(raw);
+                      }}
                       className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                       placeholder="Masukkan biaya perbaikan"
                     />
