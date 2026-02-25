@@ -33,8 +33,18 @@ void main() async {
   // Jika ada token, langsung ke dashboard sesuai role. Jika tidak, ke login.
   String initialRoute = '/';
   if (token != null && token.isNotEmpty) {
-    bool isAdmin = (role == 'super_admin' || role == 'store_admin');
-    initialRoute = isAdmin ? '/admin-dashboard' : '/dashboard';
+    // Store admin tidak boleh login di mobile app
+    if (role == 'store_admin' || role == 'store_staff') {
+      // Hapus token dan redirect ke login
+      await prefs.remove('auth_token');
+      await prefs.remove('user_role');
+      await prefs.remove('user_data');
+      initialRoute = '/';
+    } else if (role == 'super_admin') {
+      initialRoute = '/admin-dashboard';
+    } else {
+      initialRoute = '/dashboard';
+    }
   }
   
   runApp(MyApp(initialRoute: initialRoute));

@@ -1,6 +1,7 @@
 // lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../utils/snackbar_helper.dart'; 
 
@@ -37,6 +38,43 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         final data = await _apiService.getUserProfile();
         final role = data['role'] ?? 'customer';
+        
+        // Block store_admin/store_staff dari mobile app
+        if (role == 'store_admin' || role == 'store_staff') {
+          // Hapus token dan data
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('auth_token');
+          await prefs.remove('user_role');
+          await prefs.remove('user_data');
+          
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.block, color: Colors.red, size: 28),
+                    SizedBox(width: 8),
+                    Text('Akses Ditolak'),
+                  ],
+                ),
+                content: const Text(
+                  'Akun Store Admin hanya bisa login melalui website Admin Dashboard.\n\nSilakan buka browser dan akses halaman Admin Store.',
+                  style: TextStyle(fontSize: 15),
+                ),
+                actions: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                    child: const Text('OK, Mengerti', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return;
+        }
         
         if (role == 'super_admin') {
           Navigator.pushReplacementNamed(context, '/admin-dashboard');
