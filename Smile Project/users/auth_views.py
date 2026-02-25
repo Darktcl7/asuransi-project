@@ -64,6 +64,7 @@ def custom_login(request):
     """
     identifier = request.data.get('identifier', '').strip()
     password = request.data.get('password', '')
+    platform = request.data.get('platform', '')  # 'mobile' or 'web'
     
     if not identifier or not password:
         return Response({
@@ -102,6 +103,12 @@ def custom_login(request):
     if not user.is_active:
         return Response({
             'error': 'Akun tidak aktif. Hubungi administrator.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Block store_admin/store_staff from mobile app login
+    if platform == 'mobile' and user.role in ['store_admin', 'store_staff']:
+        return Response({
+            'error': 'Akun Store Admin hanya bisa login melalui website Admin Dashboard. Silakan buka browser dan akses halaman Admin Store.'
         }, status=status.HTTP_403_FORBIDDEN)
     
     # Get or create token
