@@ -19,10 +19,10 @@ class ApiService {
   // static const String baseUrl = 'http://10.0.2.2:8000/api';
   
   // For Local Physical Device (use your computer's IP address):
-  static const String baseUrl = 'http://192.168.1.4:8000/api';
+  // static const String baseUrl = 'http://192.168.1.4:8000/api';
   
   // ✅ PRODUCTION SERVER:
-  // static const String baseUrl = 'http://148.230.97.130/api';
+  static const String baseUrl = 'http://148.230.97.130/api';
   
   // ================================================================
   String? _token;
@@ -126,6 +126,7 @@ class ApiService {
         body: jsonEncode({
           'identifier': identifier, // Email OR Phone number
           'password': password,
+          'platform': 'mobile', // Block store_admin from mobile app
         }),
       ).timeout(const Duration(seconds: 30));
       
