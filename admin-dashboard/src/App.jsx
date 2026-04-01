@@ -37,7 +37,7 @@ const ProtectedRoute = ({ children }) => {
   return authService.isAuthenticated() ? children : <Navigate to="/login" replace />;
 };
 
-// Basename - uses Vite's base URL (/ in dev, /admin_store/ in production)
+// Basename - uses Vite's base URL (/ in dev, /dashboard/ in production)
 const getBasename = () => {
   const base = import.meta.env.BASE_URL || '/';
   // Remove trailing slash for react-router basename
